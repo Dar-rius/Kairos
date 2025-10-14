@@ -1,5 +1,5 @@
 import pandas as pd 
-from rl_trade.env import Env, SequenceGroup
+from rl_trade.env import Env, SequenceGroup, add_data
 import unittest
 
 MEMORY_SIZE = 5
@@ -7,16 +7,6 @@ df = pd.read_csv("btc-usd_dataset.csv")
 env = Env(data = df)
 sequence_group = SequenceGroup(MEMORY_SIZE)
 
-
-def add_data(dataset: pd.DataFrame) -> tuple:
-    open_ = dataset["Open"].to_list()
-    high_ = dataset["High"].to_list()
-    low_ = dataset["Low"].to_list()
-    close_ = dataset["Close"].to_list()
-    volume_ = dataset["Volume"].to_list()
-    return (open_, high_, low_, close_, volume_)
-
-    
 
 def test_reset():
     result = env.reset()

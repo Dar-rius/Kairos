@@ -2,10 +2,18 @@ import pandas as pd
 from .compute import calcul_sharpe_ratio, calcul_total_profit
 from .processing import to_df, convert_and_save_df, concat_df
 from collections import namedtuple, deque
-from dataclasses import dataclass
+
 def convert_to_btc(amount_usd: float, btc_value: float): return amount_usd / btc_value
 
 def convert_to_usd(amount_btc: float, btc_value: float): return amount_btc * btc_value
+
+def add_data(dataset: pd.DataFrame) -> tuple:
+    open_ = dataset["Open"].to_list()
+    high_ = dataset["High"].to_list()
+    low_ = dataset["Low"].to_list()
+    close_ = dataset["Close"].to_list()
+    volume_ = dataset["Volume"].to_list()
+    return (open_, high_, low_, close_, volume_)
 
 
 class SequenceGroup:
@@ -26,7 +34,6 @@ class SequenceGroup:
         return len(self.memory)
 
 
-
 class Env:
     def __init__(self, data: pd.DataFrame, amount_usd: int = 100000.0, memory_size: int = 5):
         self.portfolio_values: list[float] = []
@@ -42,13 +49,12 @@ class Env:
         self.sequence_group = SequenceGroup(memory_size)
         self.btc_value: float = 0.0
 
-        portfolio_values: list[float] = [0.0]
-        btc_values: list[float] = [0.0]
 
     def __buy(self):
         self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_value)
         self.total_amount[0] = 0
         
+
     def __sell(self):
         self.total_amount[0] = convert_to_usd(self.total_amount[1], self.btc_value)
         self.total_amount[1] = 0
@@ -61,21 +67,16 @@ class Env:
             return convert_to_usd(self.total_amount[1], self.btc_value)
 
 
-    def create_batch(self) -> tuple: 
+    def create_batch(self) -> tuple[list, bool]: 
         if self.sequence_group.len() > 0:
             self.sequence_group.clear()
 
         done = False
         dataset = self.data.loc[self.first_minute : self.last_minute]
-        open_ = dataset["Open"].to_list()
-        high_ = dataset["High"].to_list()
-        low_ = dataset["Low"].to_list()
-        close_ = dataset["Close"].to_list()
-        volume_ = dataset["Volume"].to_list()
-        self.sequence_group.push(open_, high_, low_, close_, volume_)
-        self.btc_value = close_[-1]
-        check_next_nb_time = len(self.data["Open"].loc[self.first_minute :].to_list())
-        print(check_next_nb_time)
+        values = add_data(dataset)
+        self.sequence_group.push(values[0], values[1], values[2], values[3], values[4])
+        self.btc_value = values[3][-1]
+        check_next_nb_time = len(self.data.loc[self.first_minute:, "Open"])
 
         if  check_next_nb_time > self.MEMORY_SIZE:
             self.last_minute += self.MEMORY_SIZE
@@ -84,37 +85,27 @@ class Env:
             done = True
 
         self.first_minute = self.last_minute
-
         return (self.sequence_group.sample(), done)
 
 
     def reset(self): return self.create_batch()
 
+
     def step(self, action: int) -> tuple:
         if action  == -1:
-            trade_info = {
-                    "action": action,
-                    "portfolio": self.calcul_portfolio_value()
-                    }
+            trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
             self.__sell()
         elif action == 1:
-            trade_info = {
-                    "action": action,
-                    "portfolio": self.calcul_portfolio_value()
-                    }
+            trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
             self.__buy()
         else:
-            trade_info = {
-                    "action": action,
-                    "portfolio": self.calcul_portfolio_value()
-                    }
+            trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
-        
-        self.portfolio_values.append(self.calcul_portfolio_value)
-        self.btc_values.append(self.btc_value)
 
+        self.portfolio_values.append(self.calcul_portfolio_value())
+        self.btc_values.append(self.btc_value)
         reward = calcul_sharpe_ratio(self.portfolio_values, self.btc_values)
         state, done = self.create_batch()
         return (state, done, reward)
