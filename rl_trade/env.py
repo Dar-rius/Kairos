@@ -7,7 +7,7 @@ def convert_to_btc(amount_usd: float, btc_value: float): return amount_usd / btc
 
 def convert_to_usd(amount_btc: float, btc_value: float): return amount_btc * btc_value
 
-def add_data(dataset: pd.DataFrame) -> tuple:
+def df_to_list(dataset: pd.DataFrame) -> tuple:
     open_ = dataset["Open"].to_list()
     high_ = dataset["High"].to_list()
     low_ = dataset["Low"].to_list()
@@ -15,7 +15,7 @@ def add_data(dataset: pd.DataFrame) -> tuple:
     volume_ = dataset["Volume"].to_list()
     return (open_, high_, low_, close_, volume_)
 
-
+# Create a group sequence
 class SequenceGroup:
     def __init__(self, memory_size:int):
         self.memory = deque([], maxlen=memory_size)
@@ -33,6 +33,7 @@ class SequenceGroup:
     def len(self) -> int:
         return len(self.memory)
 
+# ******* ENV **********
 
 class Env:
     def __init__(self, data: pd.DataFrame, amount_usd: int = 100000.0, memory_size: int = 5):
@@ -49,17 +50,14 @@ class Env:
         self.sequence_group = SequenceGroup(memory_size)
         self.btc_value: float = 0.0
 
-
     def __buy(self):
         print(self.btc_value)
         self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_value)
         self.total_amount[0] = 0
         
-
     def __sell(self):
         self.total_amount[0] = convert_to_usd(self.total_amount[1], self.btc_value)
         self.total_amount[1] = 0
-
 
     def calcul_portfolio_value(self) -> float:
         if self.total_amount[0] > 0:
@@ -67,19 +65,21 @@ class Env:
         else:
             return convert_to_usd(self.total_amount[1], self.btc_value)
 
-
+    #Create a group state
     def create_batch(self) -> tuple[list, bool]: 
+        #Clear the previous state
         if self.sequence_group.len() > 0:
             self.sequence_group.clear()
 
         done = False
         dataset = self.data.loc[self.first_minute : self.last_minute]
-        values = add_data(dataset)
+        values = df_to_list(dataset)
         self.sequence_group.push(values[0], values[1], values[2], values[3], values[4])
         print(values[3])
         self.btc_value = values[3][-1]
         check_next_nb_time = len(self.data.loc[self.first_minute:, "Open"])
-
+        
+        #check the rest quantity of data
         self.first_minute = self.last_minute
         if  check_next_nb_time > self.MEMORY_SIZE:
             self.last_minute += self.MEMORY_SIZE
@@ -89,10 +89,11 @@ class Env:
 
         return (self.sequence_group.sample(), done)
 
-
+    #Reset the env to 0
     def reset(self): return self.create_batch()
 
 
+    #The next step of env
     def step(self, action: int) -> tuple:
         if action  == -1:
             trade_info = [action, self.calcul_portfolio_value()]
@@ -106,6 +107,7 @@ class Env:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
 
+        #Compute the reward
         self.portfolio_values.append(self.calcul_portfolio_value())
         self.btc_values.append(self.btc_value)
         reward: float = calcul_sharpe_ratio(self.portfolio_values, self.btc_values)
