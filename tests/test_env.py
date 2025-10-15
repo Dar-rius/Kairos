@@ -4,34 +4,47 @@ import unittest
 
 MEMORY_SIZE = 5
 df = pd.read_csv("btc-usd_dataset.csv")
-env = Env(data = df)
 sequence_group = SequenceGroup(MEMORY_SIZE)
 
 
 def test_reset():
+    env = Env(data = df)
     result = env.reset()
-    dataset =df.loc[0 : 5]
+    dataset = df.loc[0 : 5]
     values = add_data(dataset)
     sequence_group.push(values[0], values[1], values[2], values[3], values[4])
 
     assert result == (sequence_group.sample(), False) 
 
 def test_calcul_portfolio_value():
+    env = Env(data = df)
     result = env.calcul_portfolio_value()
     assert result == 100000.0
 
-def test_step():
-    result_buy = env.step(1)
-    result_sell = env.step(-1)
-    result_none = env.step(0)
+class TestStep:
+    env = Env(data=df)
+    env.reset()
+    seq = SequenceGroup(MEMORY_SIZE)
 
-    dataset_1 = df.loc[5 : 10]
-    values_1 = add_data(dataset_1)
-    dataset_2 = df.loc[10 : 15]
-    values_2 = add_data(dataset_2)
-    dataset_3 = df.loc[15 : 20]
-    values_3 = add_data(dataset_3)
-    
-   # assert result_buy ==
+    def test_buy(self):
+        result = self.env.step(1)
+        dataset = df.loc[5 : 10]
+        values = add_data(dataset)
+        self.seq.push(values[0], values[1], values[2], values[3], values[4])
+        assert result  ==  (self.seq.sample(), False, 0.0)
 
-
+    def test_sell(self):
+        result = self.env.step(-1)
+        dataset = df.loc[5 : 10]
+        values = add_data(dataset)
+        self.seq.clear()
+        self.seq.push(values[0], values[1], values[2], values[3], values[4])
+        assert result  ==  (self.seq.sample(), False, 0.0)
+            
+    def test_null(self):
+        result = self.env.step(0)
+        dataset = df.loc[5 : 10]
+        values = add_data(dataset)
+        self.seq.clear()
+        self.seq.push(values[0], values[1], values[2], values[3], values[4])
+        assert result  ==  (self.seq.sample(), False, 0.0)

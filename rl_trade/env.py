@@ -51,6 +51,7 @@ class Env:
 
 
     def __buy(self):
+        print(self.btc_value)
         self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_value)
         self.total_amount[0] = 0
         
@@ -75,16 +76,17 @@ class Env:
         dataset = self.data.loc[self.first_minute : self.last_minute]
         values = add_data(dataset)
         self.sequence_group.push(values[0], values[1], values[2], values[3], values[4])
+        print(values[3])
         self.btc_value = values[3][-1]
         check_next_nb_time = len(self.data.loc[self.first_minute:, "Open"])
 
+        self.first_minute = self.last_minute
         if  check_next_nb_time > self.MEMORY_SIZE:
             self.last_minute += self.MEMORY_SIZE
         else:
             self.last_minute += check_next_nb_time 
             done = True
 
-        self.first_minute = self.last_minute
         return (self.sequence_group.sample(), done)
 
 
@@ -106,6 +108,6 @@ class Env:
 
         self.portfolio_values.append(self.calcul_portfolio_value())
         self.btc_values.append(self.btc_value)
-        reward = calcul_sharpe_ratio(self.portfolio_values, self.btc_values)
+        reward: float = calcul_sharpe_ratio(self.portfolio_values, self.btc_values)
         state, done = self.create_batch()
         return (state, done, reward)
