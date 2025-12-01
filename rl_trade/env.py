@@ -1,19 +1,7 @@
 import pandas as pd
 from .compute import calcul_sharpe_ratio, calcul_total_profit
-from .processing import to_df, convert_and_save_df, concat_df
+from .processing import df_to_list, concat_df, convert_tensor_to_list, convert_to_btc, convert_to_usd
 from collections import namedtuple, deque
-
-def convert_to_btc(amount_usd: float, btc_value: float): return amount_usd / btc_value
-
-def convert_to_usd(amount_btc: float, btc_value: float): return amount_btc * btc_value
-
-def df_to_list(dataset: pd.DataFrame) -> tuple:
-    open_ = dataset["Open"].to_list()
-    high_ = dataset["High"].to_list()
-    low_ = dataset["Low"].to_list()
-    close_ = dataset["Close"].to_list()
-    volume_ = dataset["Volume"].to_list()
-    return (open_, high_, low_, close_, volume_)
 
 # Create a group sequence
 class SequenceGroup:
@@ -91,7 +79,6 @@ class Env:
 
     #Reset the env to 0
     def reset(self): return self.create_batch()
-
 
     #The next step of env
     def step(self, action: int) -> tuple:

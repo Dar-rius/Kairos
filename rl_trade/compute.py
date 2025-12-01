@@ -1,6 +1,6 @@
 import pandas as pd
-from statistics import *
 import numpy as np
+from scipy.stats import entropy
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(data_p: list[float], data_btc: list[float]) -> float:
@@ -24,6 +24,14 @@ def calcul_sharpe_ratio(data_p: list[float], data_btc: list[float]) -> float:
 
     return sr.item()
 
+def compute_belief(data_p: list[float], cost: float, prob: list[float], beta: float) -> float:
+    if len(data_p) < 2:
+        return 0.0
+    n = len(data_p)
+
+    portfolio_return = pct_change(data_p[n-1], data_p[n-2])
+    entropy_prob = entropy(prob, base=2)
+    return portfolio_return - cost - (beta * entropy_prob)
 
 def calcul_total_profit(precedent_tp: float, now_tp: float): return precedent_tp - now_tp
 
