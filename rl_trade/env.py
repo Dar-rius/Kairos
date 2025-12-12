@@ -15,7 +15,7 @@ class SequenceGroup:
 
     #def push_micro(self, *args): self.micro(self.micro_day(*args))
 
-    def push(self, data: list(list)):
+    def push(self, data: list):
         self.memory.append(data)
         
     def clear(self):
@@ -62,10 +62,16 @@ class Env:
             return convert_to_usd(self.total_amount[1], self.btc_value)
 
     #Create a group state
-    def create_batch(self, n_days:int = 85, n_minutes:int = 60) -> list: 
+    def create_batch(self, n_days:int = 9, n_minutes:int = 60) -> list: 
         #dataset = self.data.loc[self.first_minute : self.last_minute]
         #values = df_to_list(dataset)
-        daily_trades = [self.daily_trade[i:i + n_minutes] for i in range(0, self.daily_trade.shape[0], n_minutes)]
+        daily_trades = []
+        for _ in range(0, n_days):
+            hour_trade = []
+            for _ in range(0,24):
+                hour_trade = [self.daily_trade[i:i + 60] for i in range(0, self.daily_trade.shape[0], 60)]
+            daily_trades.append(hour_trade)
+
         macro_trades = [self.macro_trade[i:i + n_days] for i in range(0, self.macro_trade.shape[0], n_days)]
         self.sequence_group.push([daily_trades, macro_trades])
         #self.btc_value = values[3][-1]
@@ -97,11 +103,11 @@ class Env:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
 
-        #Compute the reward
-        self.portfolio_values.append(self.calcul_portfolio_value())
-        self.btc_values.append(self.btc_value)
-        return_ = return_log(self.btc_values[-1], self.btc_values[-2])
-        reward: float = reward(return_, self.cost_rate, action, prob)
-        self.seq += 1
         state = self.sequence_group.sample()[self.seq]
+        self.portfolio_values.append(self.calcul_portfolio_value())
+        #the value [1] is just a test
+        self.btc_values.append(state[0][1])
+        return_ = return_log(self.btc_values[-1], self.btc_values[-2])
+        #Compute the reward
+        reward: float = reward(return_, self.cost_rate, action, prob)
         return (state, reward)
