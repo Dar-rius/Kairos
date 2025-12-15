@@ -16,7 +16,8 @@ sequence_group = SequenceGroup(MEMORY_SIZE)
 def test_reset():
     env = Env(daily_trade=df, macro_trade=df_1, n_days=10)
     tab1, tab2 = env.reset()
-    daily_trades = df[0:10].to_numpy()
+    n_days = 10 * 1440
+    daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
     macro_trades =  df_1[0:10].to_numpy()
     np.testing.assert_equal(tab1, daily_trades)
     np.testing.assert_equal(tab2, macro_trades)
@@ -27,7 +28,6 @@ def test_calcul_portfolio_value():
     result = env.calcul_portfolio_value()
     assert result == 100000.0
 
-"""
 # Test all case of action
 class TestStep:
     env = Env(daily_trade=df, macro_trade=df_1, n_days=85)
@@ -36,7 +36,7 @@ class TestStep:
 
     def test_buy(self):
         result = self.env.step(1, [0.0, 0.0, 0.0])
-        dataset = df.loc[5 : 10]
+        dataset = df.loc[10 : 20]
         values = df_to_list(dataset)
         self.seq.push(values[0], values[1], values[2], values[3], values[4])
         assert result  ==  (self.seq.sample(), False, 0.0)
@@ -56,4 +56,3 @@ class TestStep:
         self.seq.clear()
         self.seq.push(values[0], values[1], values[2], values[3], values[4])
         assert result  ==  (self.seq.sample(), False, 0.0)
-"""

@@ -5,7 +5,7 @@ import math
 
 BETA = 1
 
-def reward(return_: float, cost_rate: float, action: int, prob: list[float], entropy_low: float = .3) -> float:
+def reward_func(return_: float, cost_rate: float, action: int, prob: list[float], entropy_low: float = .3) -> float:
     # Compute the micro strategy for trading 1h
     first_micro = return_ * action 
     second_micro = cost_rate * abs(action)

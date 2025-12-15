@@ -1,32 +1,9 @@
 import pandas as pd
-from .compute import return_log, calcul_sharpe_ratio, calcul_total_profit, reward
+from .compute import return_log, calcul_sharpe_ratio, calcul_total_profit, reward_func
 from .processing import df_to_list, concat_df, convert_tensor_to_list, convert_to_btc, convert_to_usd
 from collections import namedtuple, deque
 #import cudf as cu
 #import cupy as cp
-
-# Create a group sequence
-class SequenceGroup:
-    def __init__(self, memory_size: int):
-        self.memory = deque([], maxlen=memory_size)
-        #self.micro_day = namedtuple("MicroDay", ('open', 'high', 'low', 'close', 'volume'))
-        #self.micro = namedtuple("Micro", ('data'))
-        #self.macro = namedtuple("Macro", ('open', 'high', 'low', 'close', 'volume'))
-
-    #def push_macro(self, *args): self.macro(*args)
-
-    #def push_micro(self, *args): self.micro(self.micro_day(*args))
-
-    def push(self, data: list):
-        self.memory.append(data)
-        
-    def clear(self):
-        self.memory.clear()
-
-    def sample(self): return self.memory 
-
-    #Show the size of memory
-    def len(self): return len(self.memory)
 
 # ******* ENV **********
 
@@ -39,15 +16,18 @@ class Env:
         self.daily_trade = daily_trade
         self.macro_trade = macro_trade
         self.n_days = n_days
-        self.start_batch: int = 0
+        self.start_min: int = 0
+        self.start_day: int = 0
         self.metric = pd.DataFrame(data={'date':[], "sharpe ratio": [], "tp": []})
         self.total_amount: dict = {0: amount_usd, 1: 0}
         self.btc_value: float = 0.0
         self.cost_rate = cost_rate
-        self.seq: int = 0
+        self.batch: list(type) = []
+        self.initial_n_days = n_days
+        self.time: list = [0,0]
+        self.size = self.macro_trade.shape[0]
 
     def __buy(self):
-        print(self.btc_value)
         self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_value)
         self.total_amount[0] = 0
         
@@ -62,17 +42,32 @@ class Env:
             return convert_to_usd(self.total_amount[1], self.btc_value)
 
     #Create a group state
-    def create_batch(self) -> tuple: 
-        days_trade = self.daily_trade.shape[0] // 1440
-        daily_trades = self.daily_trade[self.start_batch:self.n_days].to_numpy()
-        macro_days = self.macro_trade[self.start_batch:self.n_days].to_numpy()
-        self.start_batch += self.n_days
-        self.n_days += self.n_days
-        print(days_trade)
-        return (daily_trades, macro_days)
+    def create_batch(self): 
+        n_minutes = self.n_days * 1440
+        daily_trades = self.daily_trade[self.start_min:n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
+        macro_days = self.macro_trade[self.start_day:self.n_days].to_numpy()
+        self.start_min = n_minutes
+        self.start_day = self.n_days
+        self.n_days += self.initial_n_days if self.n_days + self.initial_n_days < self.size else (self.n_days + self.initial_n_days) - self.size
+        return [daily_trades, macro_days]
+
+    def __all_reset(self):
+        self.n_days = self.initial_n_days
+        self.start_min = 0
+        self.start_day = 0
+        self.batch.clear()
+
+    def __select_state(self):
+        data = [self.batch[0][self.time[0]][self.time[1]], self.batch[1][self.time[0]]]
+        self.time[0] = self.time[0] + 1 if self.time[1] == 23 else self.time[0]
+        self.time[1] = 0 if self.time[1] == 23 else self.time[1] + 1
+        return data
 
     #Reset the env to 0
-    def reset(self): return self.create_batch()
+    def reset(self):
+        if self.n_days > self.initial_n_days: self.__all_reset()
+        self.batch.extend(self.create_batch())
+        return self.__select_state()
 
     #The next step of env
     def step(self, action: int, prob: list[float]) -> tuple:
@@ -88,11 +83,11 @@ class Env:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
 
-        state = self.create_batch()
+        done = True if self.n_days >= self.size else False
+        state = self.__select_state()
         self.portfolio_values.append(self.calcul_portfolio_value())
-        #the value [1] is just a test
-        self.btc_values.append(state[0][1])
+        self.btc_values.append(state[0][-1][3])
         return_ = return_log(self.btc_values[-1], self.btc_values[-2])
         #Compute the reward
-        reward: float = reward(return_, self.cost_rate, action, prob)
-        return (state, reward)
+        reward: float = reward_func(return_, self.cost_rate, action, prob)
+        return (state, reward, done)
