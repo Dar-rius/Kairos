@@ -20,7 +20,6 @@ class Env:
         self.start_day: int = 0
         self.metric = pd.DataFrame(data={'date':[], "sharpe ratio": [], "tp": []})
         self.total_amount: dict = {0: amount_usd, 1: 0}
-        self.btc_value: float = 0.0
         self.cost_rate = cost_rate
         self.batch: list(type) = []
         self.initial_n_days = n_days
@@ -28,18 +27,15 @@ class Env:
         self.size = self.macro_trade.shape[0]
 
     def __buy(self):
-        self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_value)
+        self.total_amount[1] = convert_to_btc(self.total_amount[0], self.btc_values[-1])
         self.total_amount[0] = 0
         
     def __sell(self):
-        self.total_amount[0] = convert_to_usd(self.total_amount[1], self.btc_value)
+        self.total_amount[0] = convert_to_usd(self.total_amount[1], self.btc_values[-1])
         self.total_amount[1] = 0
 
     def calcul_portfolio_value(self) -> float:
-        if self.total_amount[0] > 0:
-            return self.total_amount[0]
-        else:
-            return convert_to_usd(self.total_amount[1], self.btc_value)
+        return self.total_amount[0] if self.total_amount[0] > 0 else convert_to_usd(self.total_amount[1], self.btc_values[-1])
 
     #Create a group state
     def create_batch(self): 
@@ -71,6 +67,11 @@ class Env:
 
     #The next step of env
     def step(self, action: int, prob: list[float]) -> tuple:
+        done = True if self.n_days >= self.size else False
+        state = self.__select_state()
+        self.btc_values.append(state[0][-1][3])
+        self.portfolio_values.append(self.calcul_portfolio_value())
+        print(self.btc_values)
         if action  == -1:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
@@ -82,12 +83,7 @@ class Env:
         else:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
-
-        done = True if self.n_days >= self.size else False
-        state = self.__select_state()
-        self.portfolio_values.append(self.calcul_portfolio_value())
-        self.btc_values.append(state[0][-1][3])
-        return_ = return_log(self.btc_values[-1], self.btc_values[-2])
+        return_ = return_log(self.btc_values[-1], self.btc_values[-2]) if len(self.btc_values) > 1 else 0
         #Compute the reward
         reward: float = reward_func(return_, self.cost_rate, action, prob)
         return (state, reward, done)

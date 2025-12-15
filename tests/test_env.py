@@ -5,6 +5,7 @@ from pandas.testing import assert_frame_equal
 import numpy as np
 #import cudf as cu
 #import cupy as cp
+import random
 
 MEMORY_SIZE = 5
 df = pd.read_csv("./data_off/unit_test/unit_test_df_price.csv")
@@ -27,33 +28,38 @@ def test_calcul_portfolio_value():
     result = env.calcul_portfolio_value()
     assert result == 100000.0
 
-"""# Test all case of action
+# Test all case of action
 class TestStep:
-    env = Env(daily_trade=df, macro_trade=df_1, n_days=85)
+    env = Env(daily_trade=df, macro_trade=df_1, n_days=10)
     env.reset()
-    seq = SequenceGroup(MEMORY_SIZE)
 
     def test_buy(self):
-        result = self.env.step(1, [0.0, 0.0, 0.0])
-        dataset = df.loc[10 : 20]
-        values = df_to_list(dataset)
-        self.seq.push(values[0], values[1], values[2], values[3], values[4])
-        assert result  ==  (self.seq.sample(), False, 0.0)
+        state, reward, done = self.env.step(1, [0.0, 0.0, 0.0])
+        n_days = 10 * 1440
+        daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
+        macro_trades =  df_1[0:10].to_numpy()
+        np.testing.assert_equal(state[0], daily_trades[0][1])
+        np.testing.assert_equal(state[1], macro_trades[0])
+        assert reward  !=  0
+        assert done == False
 
     def test_sell(self):
-        result = self.env.step(-1, [0.0, 0.0, 0.0])
-        dataset = df.loc[5 : 10]
-        values = df_to_list(dataset)
-        self.seq.clear()
-        self.seq.push(values[0], values[1], values[2], values[3], values[4])
-        assert result  ==  (self.seq.sample(), False, 0.0)
+        state, reward, done = self.env.step(-1, [0.0, 0.0, 0.0])
+        n_days = 10 * 1440
+        daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
+        macro_trades =  df_1[0:10].to_numpy()
+        np.testing.assert_equal(state[0], daily_trades[0][2])
+        np.testing.assert_equal(state[1], macro_trades[0])
+        assert reward  !=  0
+        assert done == False
             
     def test_null(self):
-        result = self.env.step(0, [0.0, 0.0, 0.0])
-        dataset = df.loc[5 : 10]
-        values = df_to_list(dataset)
-        self.seq.clear()
-        self.seq.push(values[0], values[1], values[2], values[3], values[4])
-        assert result  ==  (self.seq.sample(), False, 0.0)
-"""
+        state, reward, done = self.env.step(1, [0.0, 0.0, 0.0])
+        n_days = 10 * 1440
+        daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
+        macro_trades =  df_1[0:10].to_numpy()
+        np.testing.assert_equal(state[0], daily_trades[0][3])
+        np.testing.assert_equal(state[1], macro_trades[0])
+        assert reward  !=  0
+        assert done == False
 
