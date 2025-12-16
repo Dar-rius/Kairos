@@ -6,12 +6,14 @@ import numpy as np
 #import cudf as cu
 #import cupy as cp
 import random
+import torch
 
 MEMORY_SIZE = 5
 df = pd.read_csv("./data_off/unit_test/unit_test_df_price.csv")
 jf = df.drop('Datetime_utc', axis=1)
 df_1 = pd.read_csv("./data_off/unit_test/unit_test_df_metric.csv")
 df_1 = df_1.drop(['date', 'state'], axis=1)
+prob = torch.zeros([3], dtype=torch.float32)
 
 def test_reset():
     env = Env(daily_trade=df, macro_trade=df_1, n_days=10)
@@ -34,7 +36,7 @@ class TestStep:
     env.reset()
 
     def test_buy(self):
-        state, reward, done = self.env.step(1, [0.0, 0.0, 0.0])
+        state, reward, done = self.env.step(1, prob)
         n_days = 10 * 1440
         daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
         macro_trades =  df_1[0:10].to_numpy()
@@ -44,7 +46,7 @@ class TestStep:
         assert done == False
 
     def test_sell(self):
-        state, reward, done = self.env.step(-1, [0.0, 0.0, 0.0])
+        state, reward, done = self.env.step(-1, prob)
         n_days = 10 * 1440
         daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
         macro_trades =  df_1[0:10].to_numpy()
@@ -54,7 +56,7 @@ class TestStep:
         assert done == False
             
     def test_null(self):
-        state, reward, done = self.env.step(1, [0.0, 0.0, 0.0])
+        state, reward, done = self.env.step(1, prob)
         n_days = 10 * 1440
         daily_trades = df[0:n_days].to_numpy().reshape(10, 24, 60, -1)
         macro_trades =  df_1[0:10].to_numpy()
@@ -62,4 +64,9 @@ class TestStep:
         np.testing.assert_equal(state[1], macro_trades[0])
         assert reward  !=  0
         assert done == False
-
+    """
+    def test_finish_batch(self):
+        done = False
+        while not done:
+            result = self.env.step(1, prob)  
+    """        

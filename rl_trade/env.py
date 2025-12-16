@@ -1,7 +1,8 @@
 import pandas as pd
 from .compute import return_log, calcul_sharpe_ratio, calcul_total_profit, reward_func
-from .processing import df_to_list, concat_df, convert_tensor_to_list, convert_to_btc, convert_to_usd
+from .processing import df_to_list, concat_df, convert_to_btc, convert_to_usd
 from collections import namedtuple, deque
+from torch import Tensor
 #import cudf as cu
 #import cupy as cp
 
@@ -66,7 +67,7 @@ class Env:
         return self.__select_state()
 
     #The next step of env
-    def step(self, action: int, prob: list[float]) -> tuple:
+    def step(self, action: int, prob: Tensor) -> tuple:
         done = True if self.n_days >= self.size else False
         state = self.__select_state()
         self.btc_values.append(state[0][-1][3])

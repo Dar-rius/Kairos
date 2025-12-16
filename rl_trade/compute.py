@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 from scipy.stats import entropy
 import math
+from torch import Tensor
+from .processing import convert_tensor_to_list
 
 BETA = 1
 
-def reward_func(return_: float, cost_rate: float, action: int, prob: list[float], entropy_low: float = .3) -> float:
+def reward_func(return_: float, cost_rate: float, action: int, prob: Tensor, entropy_low: float = .3) -> float:
+    prob = convert_tensor_to_list(prob)
     # Compute the micro strategy for trading 1h
     first_micro = return_ * action 
     second_micro = cost_rate * abs(action)

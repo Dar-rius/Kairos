@@ -14,7 +14,7 @@ def convert_and_save_df(data: dict, filename: str):
     df.to_csv(filename, orient = 'index')
 
 #Convert the Tensor to List
-def convert_tensor_to_list(tensor: Tensor): return tensor.to_list()
+def convert_tensor_to_list(tensor: Tensor): return tensor.tolist()
 
 def convert_to_btc(amount_usd: float, btc_value: float): return amount_usd / btc_value
 
