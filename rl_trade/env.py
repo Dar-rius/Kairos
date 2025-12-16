@@ -40,13 +40,14 @@ class Env:
 
     #Create a group state
     def create_batch(self): 
+        self.time =[0, 0] if self.time[0] == 10 else self.time
         n_minutes = self.n_days * 1440
         daily_trades = self.daily_trade[self.start_min:n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
         macro_days = self.macro_trade[self.start_day:self.n_days].to_numpy()
         self.start_min = n_minutes
         self.start_day = self.n_days
         self.n_days += self.initial_n_days if self.n_days + self.initial_n_days < self.size else (self.n_days + self.initial_n_days) - self.size
-        return [daily_trades, macro_days]
+        self.batch = [daily_trades, macro_days]
 
     def __all_reset(self):
         self.n_days = self.initial_n_days
@@ -54,25 +55,25 @@ class Env:
         self.start_day = 0
         self.batch.clear()
 
-    def __select_state(self):
+    def __select_state(self) -> (list, bool):
         data = [self.batch[0][self.time[0]][self.time[1]], self.batch[1][self.time[0]]]
         self.time[0] = self.time[0] + 1 if self.time[1] == 23 else self.time[0]
         self.time[1] = 0 if self.time[1] == 23 else self.time[1] + 1
-        return data
+        done = True if self.time[0] == self.initial_n_days else False
+        return (data, done)
 
     #Reset the env to 0
     def reset(self):
         if self.n_days > self.initial_n_days: self.__all_reset()
-        self.batch.extend(self.create_batch())
+        self.create_batch()
         return self.__select_state()
 
     #The next step of env
     def step(self, action: int, prob: Tensor) -> tuple:
-        done = True if self.n_days >= self.size else False
-        state = self.__select_state()
-        self.btc_values.append(state[0][-1][3])
+        state, done = self.__select_state()
+        if done: return ([], 0.0, done)
+        self.btc_values.append(state[0][-1][1])
         self.portfolio_values.append(self.calcul_portfolio_value())
-        print(self.btc_values)
         if action  == -1:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)

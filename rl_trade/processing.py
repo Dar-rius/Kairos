@@ -28,5 +28,3 @@ def df_to_list(dataset: pd.DataFrame) -> tuple:
     close_ = dataset["Close"].to_list()
     volume_ = dataset["Volume"].to_list()
     return (open_, high_, low_, close_, volume_)
-
-
