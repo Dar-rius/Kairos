@@ -8,74 +8,68 @@ import numpy as np
 import random
 import torch
 
-MEMORY_SIZE = 5
-df = pd.read_csv("./data_off/unit_test/unit_test_df_price.csv")
-jf = df.drop('Datetime_utc', axis=1)
+df = pd.read_csv("./data_off/unit_test/unit_test_norm_price.csv")
 df_1 = pd.read_csv("./data_off/unit_test/unit_test_df_metric.csv")
-df_1 = df_1.drop(['date', 'state'], axis=1)
+price = pd.read_csv("./data_off/unit_test/unit_test_price_close.csv")
 prob = torch.zeros([3], dtype=torch.float32)
 
 def test_reset():
-    env = Env(daily_trade=df, macro_trade=df_1, n_days=10)
+    env = Env(daily_trade=df, macro_trade=df_1, price=price, n_days=10)
     tab1, tab2 = env.reset()
-    n_minutes = 10 * 1440
-    daily_trades = df[0:n_minutes].to_numpy().reshape(10, 24, 60, -1)
-    macro_trades =  df_1[0:10].to_numpy()
-    np.testing.assert_equal(tab1, daily_trades[0][0])
-    np.testing.assert_equal(tab2, macro_trades[0])
-    
+    daily_trades = df[0:23].to_numpy()
+    macro_trades =  df_1.loc[1].to_numpy()
+    np.testing.assert_equal(daily_trades, tab1)
+    np.testing.assert_equal(macro_trades, tab2)
 
 def test_calcul_portfolio_value():
-    env = Env(daily_trade=df, macro_trade=df_1, n_days=85)
+    env = Env(daily_trade=df, macro_trade=df_1, price=price, n_days=85)
     result = env.calcul_portfolio_value()
     assert result == 100000.0
 
 # Test all case of action
 class TestStep:
-    env = Env(daily_trade=df, macro_trade=df_1, n_days=10)
+    env = Env(daily_trade=df, macro_trade=df_1, price=price, n_days=10)
     env.reset()
-    n_days = 10
-    n_minutes = n_days * 1440 
 
     def test_buy(self):
         state, reward, done = self.env.step(1, prob)
-        daily_trades = df[0:self.n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
-        macro_trades =  df_1[0:self.n_days].to_numpy()
-        np.testing.assert_equal(state[0], daily_trades[0][1])
-        np.testing.assert_equal(state[1], macro_trades[0])
-        assert reward  !=  0
-        assert done == False
+        daily_trades = df[1:24].to_numpy()
+        macro_trades =  df_1.loc[1].to_numpy()
+        np.testing.assert_equal(daily_trades, state[0])
+        np.testing.assert_equal(macro_trades,state[1])
+        assert reward  !=  0.0
+        assert not done
 
     def test_sell(self):
         state, reward, done = self.env.step(-1, prob)
-        daily_trades = df[0:self.n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
-        macro_trades =  df_1[0:self.n_days].to_numpy()
-        np.testing.assert_equal(state[0], daily_trades[0][2])
-        np.testing.assert_equal(state[1], macro_trades[0])
-        assert reward  !=  0
+        daily_trades = df[2:25].to_numpy()
+        macro_trades =  df_1.loc[1].to_numpy()
+        np.testing.assert_equal(daily_trades, state[0])
+        np.testing.assert_equal(macro_trades,state[1])
+        assert reward  !=  0.0
         assert not done
             
     def test_null(self):
-        state, reward, done = self.env.step(1, prob)
-        daily_trades = df[0:self.n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
-        macro_trades =  df_1[0:self.n_days].to_numpy()
-        np.testing.assert_equal(state[0], daily_trades[0][3])
-        np.testing.assert_equal(state[1], macro_trades[0])
-        assert reward  !=  0
+        state, reward, done = self.env.step(0, prob)
+        daily_trades = df[3:26].to_numpy()
+        macro_trades =  df_1.loc[1].to_numpy()
+        np.testing.assert_equal(daily_trades, state[0])
+        np.testing.assert_equal(macro_trades,state[1])
+        assert reward  ==  -0.0
         assert not done
     
+    # Test if we train an agent
     def test_finish_batch(self):
-        done = False
-        while not done:
-            _, _, done = self.env.step(1, prob)  
+        start = 3
+        end = 26
+        start_n = 1
+        for _ in range(0,48):
+            start += 1
+            end += 1
+            start_n = start_n + 1 if self.env.seq == 0 else start_n
+            daily_trades = df[start:end].to_numpy()
+            macro_trades =  df_1.loc[start_n].to_numpy()
+            state, _, done = self.env.step(1, prob)
+            np.testing.assert_equal(daily_trades, state[0])
+            np.testing.assert_equal(macro_trades, state[1])
             if done: break
-        self.env.create_batch()
-        state, reward, done = self.env.step(1, prob)
-        n_minutes_start = self.n_minutes
-        self.n_minutes += self.n_minutes
-        daily_trades = df[n_minutes_start:self.n_minutes].to_numpy().reshape(self.n_days, 24, 60, -1)
-        macro_trades =  df_1[self.n_days:self.n_days*2].to_numpy()
-        np.testing.assert_equal(state[0], daily_trades[0][0])
-        np.testing.assert_equal(state[1], macro_trades[0]) 
-        assert reward != 0  
-        assert not done
