@@ -7,17 +7,15 @@ class PPOTrainer:
     def __init__(self, model, lr=3e-4, gamma=0.99, gae_lambda=0.95, clip_eps=0.2, value_coef=0.5, belief_coef=0.5, ent_coef=0.01):
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
-        
-        # Hyperparamètres PPO
-        self.gamma = gamma           # Importance du futur
-        self.gae_lambda = gae_lambda # Lissage de l'avantage
-        self.clip_eps = clip_eps     # Empêche les changements trop brutaux
-        
-        # Coefficients de la Loss Totale
+        # Hyperparams PPO
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda
+        self.clip_eps = clip_eps
+        # Total Loss Coefficients
         self.value_coef = value_coef
         self.belief_coef = belief_coef
         self.ent_coef = ent_coef
-        
+        # nn compute class from torch
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss() # Pour la classification du régime (Belief)
 
@@ -31,17 +29,15 @@ class PPOTrainer:
         returns = []
         gae = 0
         values = values + [next_value]
-        
         for step in reversed(range(len(rewards))):
             delta = rewards[step] + (self.gamma * values[step + 1] * masks[step]) - values[step]
             gae = delta + (self.gamma * self.gae_lambda) * masks[step] * gae
             returns.insert(0, gae + values[step])
-            
         return returns
 
     def update(self, memory, batch_size=64, epochs=4):
         """
-        Cœur de l'algorithme PPO : Mise à jour des poids du réseau.
+        Update network weights
         """
         # 1. Conversion des listes en Tensors
         micro_states = torch.FloatTensor(np.array(memory['micro_states']))
@@ -50,7 +46,8 @@ class PPOTrainer:
         old_log_probs = torch.FloatTensor(memory['log_probs'])
         returns = torch.FloatTensor(memory['returns'])
         advantages = torch.FloatTensor(memory['advantages'])
-        target_regimes = torch.LongTensor(memory['target_regimes']) # Le vrai régime (0,1,2) calculé par l'env
+        # the target (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
+        target_regimes = torch.LongTensor(memory['target_regimes'])
 
         # Normalisation des avantages (Crucial pour la stabilité)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -60,8 +57,6 @@ class PPOTrainer:
         indices = np.arange(dataset_size)
 
         for _ in range(epochs):
-            np.random.shuffle(indices) # Mélange pour casser les corrélations
-            
             for start in range(0, dataset_size, batch_size):
                 end = start + batch_size
                 idx = indices[start:end]
@@ -92,12 +87,11 @@ class PPOTrainer:
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
                        (self.belief_coef * belief_loss) - \
-                       (self.ent_coef * dist_entropy.mean()) # Bonus d'exploration
+                       (self.ent_coef * dist_entropy.mean())
 
-                # G. Backpropagation
+                # Backpropagation
                 self.optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5) # Sécurité anti-explosion
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
-
         return loss.item()
