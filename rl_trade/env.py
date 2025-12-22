@@ -49,7 +49,6 @@ class Env:
 
     #Create a group state
     def new_state(self): 
-        print(self.time[2])
         daily_trades = self.hour_trade[self.time[1]:self.time[2]].to_numpy()
         macro_days = self.macro_trade.loc[self.time[0]].to_numpy()
         self.btc_values.append(self.price.loc[self.time[2]]["Close"])
@@ -62,7 +61,7 @@ class Env:
         return self.new_state()
 
     #The next step of env
-    def step(self, action: int, prob: Tensor) -> tuple:
+    def step(self, action: int, entropy_b: Tensor) -> tuple:
         state = self.new_state()
         self.portfolio_values.append(self.calcul_portfolio_value())
         if action  == -1:
@@ -79,5 +78,5 @@ class Env:
         return_ = return_log(self.btc_values[-1], self.btc_values[-2]) if len(self.btc_values) > 1 else 0
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         #Compute the reward
-        reward: float = reward_func(return_, self.cost_rate, action, prob)
+        reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
         return (state, reward, done)

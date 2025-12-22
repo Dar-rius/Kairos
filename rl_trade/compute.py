@@ -8,7 +8,7 @@ from .processing import convert_tensor_to_list
 BETA = 1
 
 def reward_func(return_: float, cost_rate: float, action: int, entropy_b: Tensor, entropy_low: float = .3) -> float:
-    entropy_b = convert_tensor_to_list(entropy_b)
+    entropy_b = entropy_b.item()
     # Compute the micro strategy for trading 1h
     first_micro = return_ * action
     second_micro = cost_rate * abs(action)

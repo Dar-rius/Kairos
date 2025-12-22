@@ -11,7 +11,7 @@ import torch
 df = pd.read_csv("./data_off/unit_test/unit_test_norm_price.csv")
 df_1 = pd.read_csv("./data_off/unit_test/unit_test_df_metric.csv")
 price = pd.read_csv("./data_off/unit_test/unit_test_price_close.csv")
-prob = torch.zeros([3], dtype=torch.float32)
+prob = torch.zeros([1], dtype=torch.float32)
 
 def test_reset():
     env = Env(daily_trade=df, macro_trade=df_1, price=price, n_days=10)

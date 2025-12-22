@@ -2,9 +2,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+from .buffer import Buffer
+from .model import Agent
 
 class PPOTrainer:
-    def __init__(self, model, lr=3e-4, gamma=0.99, gae_lambda=0.95, clip_eps=0.2, value_coef=0.5, belief_coef=0.5, ent_coef=0.01):
+    def __init__(self, model:Agent, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, ent_coef:float=0.01):
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
         # Hyperparams PPO
@@ -15,80 +17,50 @@ class PPOTrainer:
         self.value_coef = value_coef
         self.belief_coef = belief_coef
         self.ent_coef = ent_coef
-        # nn compute class from torch
         self.mse_loss = nn.MSELoss()
-        self.ce_loss = nn.CrossEntropyLoss() # Pour la classification du régime (Belief)
+        self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards, values, masks, next_value):
-        """
-        On utilise un mask pour empecher l'agent de faire une correlation les steps
-        suivant apres la fin du batch
-        Calcul de l'Avantage (Generalized Advantage Estimation)
-        C'est ce qui dit à l'agent : "Cette action était X fois mieux que prévu."
-        """
-        returns = []
-        gae = 0
-        values = values + [next_value]
+    def compute_gae(self, rewards:list(float), values:list(float), masks:float):
+        returns: list(float) = []
+        gae: float = 0.0
         for step in reversed(range(len(rewards))):
-            delta = rewards[step] + (self.gamma * values[step + 1] * masks[step]) - values[step]
-            gae = delta + (self.gamma * self.gae_lambda) * masks[step] * gae
-            returns.insert(0, gae + values[step])
+            delta = rewards[step] + self.gamma * values[step + 1] * masks[step] - values[step]
+            gae = delta + self.gamma * self.gae_lambda * masks[step] * gae
+            returns.insert(0, gae)
         return returns
 
-    def update(self, memory, batch_size=64, epochs=4):
-        """
-        Update network weights
-        """
-        # 1. Conversion des listes en Tensors
-        micro_states = torch.FloatTensor(np.array(memory['micro_states']))
-        macro_states = torch.FloatTensor(np.array(memory['macro_states']))
-        actions = torch.LongTensor(memory['actions'])
-        old_log_probs = torch.FloatTensor(memory['log_probs'])
-        returns = torch.FloatTensor(memory['returns'])
-        advantages = torch.FloatTensor(memory['advantages'])
-        # the target (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        target_regimes = torch.LongTensor(memory['target_regimes'])
-
-        # Normalisation des avantages (Crucial pour la stabilité)
+    # Update network weights
+    def update(self, memory: Buffer, batch_size:int=64, epochs:int=4):
+        # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
+        micro_states, macro_states, actions, old_log_probs, returns, advantages, target_regimes = memory
+        # Normalize the advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-        # 2. Boucle d'optimisation (Plusieurs passages sur les données)
         dataset_size = len(actions)
-        indices = np.arange(dataset_size)
-
+        step = dataset_size // batch_size
+        indices = np.arange(0, dataset_size, step)
         for _ in range(epochs):
-            for start in range(0, dataset_size, batch_size):
+            np.random.shuffle(indices)
+            for start in indices:
                 end = start + batch_size
-                idx = indices[start:end]
-
-                # A. Ré-évaluation avec le modèle actuel (qui change à chaque step)
-                _, new_log_probs, dist_entropy, new_values, belief_logits, _ = self.model.get_action_and_value(
-                    micro_states[idx], 
-                    macro_states[idx], 
-                    actions[idx]
-                )
+                idx = slice(start,end)
                 
-                # B. Calcul du Ratio (Probabilité Nouvelle / Probabilité Ancienne)
+                # Evaluate model again 
+                _, new_log_probs, dist_entropy, new_values, belief_logits, _ = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                # Compute Ratio (new Policy / old Policy)
                 ratio = torch.exp(new_log_probs - old_log_probs[idx])
-                
-                # C. Loss PPO (Policy Loss) - Le cœur du "Clip"
+                # Loss PPO
                 surr1 = ratio * advantages[idx]
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages[idx]
                 policy_loss = -torch.min(surr1, surr2).mean()
-                
-                # D. Loss Value (Critic) - MSE
+                # Loss Value (Critic) - MSE
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx])
-                
-                # E. Loss Belief (Auxiliary) - Cross Entropy
-                # On compare la prédiction (belief_logits) avec la réalité (target_regimes)
+                # Loss Belief (Auxiliary) - Cross Entropy
                 belief_loss = self.ce_loss(belief_logits, target_regimes[idx])
-
-                # F. Loss Totale (Combinaison pondérée)
+                # Total Loss
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
                        (self.belief_coef * belief_loss) - \
                        (self.ent_coef * dist_entropy.mean())
-
                 # Backpropagation
                 self.optimizer.zero_grad()
                 loss.backward()

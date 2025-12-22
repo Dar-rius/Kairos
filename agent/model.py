@@ -18,14 +18,12 @@ class Agent(nn.Module):
         # --- 2. Macro Branch  ---
         self.macro_layer = nn.Sequential(
             nn.Linear(macro_input_dim, 32),
-            nn.ReLU()
-        )
+            nn.ReLU())
         
         # --- 3. Fusion ---
         self.shared_layer = nn.Sequential(
             nn.Linear(hidden_dim + 32, 64),
-            nn.ReLU()
-        )
+            nn.ReLU())
         
         # --- 4. Heads ---
         self.actor = nn.Linear(64, action_dim)
