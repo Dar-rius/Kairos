@@ -5,7 +5,7 @@ from torch.distributions import Categorical
 import numpy as np
 
 class Agent(nn.Module):
-    def __init__(self, micro_input_dim: int = 6, macro_input_dim: int = 7, action_dim: int = 3, hidden_dim: int = 128):
+    def __init__(self, micro_input_dim:int=6, macro_input_dim:int=7, action_dim:int=3, hidden_dim:int=128):
         super(Agent, self).__init__()
         
         # --- Micro Branch---
@@ -42,7 +42,7 @@ class Agent(nn.Module):
             nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
             nn.init.constant_(layer.bias, 0.0)
 
-    def forward(self, micro_x, macro_x):
+    def forward(self, micro_x:np.array, macro_x:np.array):
         _, (h_n, _) = self.lstm(micro_x)
         micro_out = h_n[-1]
         macro_out = self.macro_layer(macro_x)
@@ -54,11 +54,10 @@ class Agent(nn.Module):
         belief_logits = self.belief(latent)
         return actor_logits, value, belief_logits
 
-    def get_action_and_value(self, micro_x, macro_x, action=None):
+    def get_action_and_value(self, micro_x:np.array, macro_x:np.array, action:int=None):
         actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
         probs = Categorical(logits=actor_logits)
-        if action is None:
-            action = probs.sample()
+        if action is None: action = probs.sample()
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
         belief_probs = F.softmax(belief_logits, dim=1)
