@@ -2,11 +2,14 @@ import pandas as pd
 
 norm_price = pd.read_csv("./data_off/btc-usd.csv")
 df_metric = pd.read_csv("./data_off/metric_market.csv")
+#Transform str to int in state variable
 regime_mapping = {
         "Stable": 0,
         "Volatility": 1,
         "Crisis": 2
         }
+df_metric["state"] = df_metric["state"].map(regime_mapping)
+df_metric["state"] = df_metric["state"].astype(int)
 
 # For norm_price
 # Unit Test 
@@ -26,8 +29,6 @@ metric_test.to_csv("./data_off/unit_test/metric.csv")
 state_test = df_metric["state"].loc[0:50]
 state_test.to_csv("./data_off/unit_test/state.csv")
 # Train Test
-df_metric["state"] = df_metric["state"].map(regime_mapping)
-df_metric["state"] = df_metric["state"].astype(int)
 df_metric["state"].to_csv("./data_off/train_test/state.csv")
 df_metric = df_metric.drop(["date", "state"], axis=1)
 df_metric.to_csv("./data_off/train_test/metric.csv")
