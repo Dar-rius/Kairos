@@ -20,13 +20,15 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards:list(float), values:list(float), masks:float):
+    def compute_gae(self, rewards:list(float), values:list(float), last_value:float, dones:list(float)):
+        values= values + [last_value]
         returns: list(float) = []
         gae: float = 0.0
         for step in reversed(range(len(rewards))):
-            delta = rewards[step] + self.gamma * values[step + 1] * masks[step] - values[step]
-            gae = delta + self.gamma * self.gae_lambda * masks[step] * gae
-            returns.insert(0, gae)
+            mask = 1.0 - dones[step]
+            delta = rewards[step] + self.gamma * values[step + 1] * mask - values[step]
+            gae = delta + self.gamma * self.gae_lambda * mask * gae
+            returns.insert(0,  gae + values[step])
         return returns
 
     # Update network weights
@@ -36,8 +38,7 @@ class PPOTrainer:
         # Normalize the advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         dataset_size = len(actions)
-        step = dataset_size // batch_size
-        indices = np.arange(0, dataset_size, step)
+        indices = np.arange(0, dataset_size, batch_size)
         for _ in range(epochs):
             np.random.shuffle(indices)
             for start in indices:

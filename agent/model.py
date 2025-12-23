@@ -35,11 +35,11 @@ class Agent(nn.Module):
         # Initialize LSTM
         for name, param in self.lstm.named_parameters():
             if 'weight' in name:
-                nn.init.orthogonal_(param, gain=np.sqrt(2))
+                nn.init.orthogonal_(param, gain=np.sqrt(1))
             elif 'bias' in name:
                 nn.init.constant_(param, 0.0)
         for layer in [self.macro_layer[0], self.shared_layer[0], self.actor, self.critic, self.belief]:
-            nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+            nn.init.orthogonal_(layer.weight, gain=np.sqrt(1))
             nn.init.constant_(layer.bias, 0.0)
 
     def forward(self, micro_x:np.array, macro_x:np.array):
