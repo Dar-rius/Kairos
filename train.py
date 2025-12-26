@@ -1,5 +1,5 @@
 from rl_trade.env import Env
-from agent.ppo import PPOTrainer
+from agent.ppo import PPOTrainer, Writter
 from agent.buffer import Buffer
 from agent.model import Agent
 from tqdm import tqdm # Barre de progression
@@ -36,6 +36,7 @@ STATE_DIM = env.observation_space
 agent = Agent(STATE_DIM[0], STATE_DIM[0], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1])
+writter = Writter("./results/")
 
 # Run env
 micro_obs, macro_obs = env.reset()
@@ -44,7 +45,7 @@ global_step = 0
 for update in range(1, UPDATE_EPOCHS + 1):
     cumulative_reward = 0
     # Collecte phase
-    for step in range(NUM_STEP):
+    for step in tqdm(range(NUM_STEP)):
         global_step += 1
         micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
@@ -81,7 +82,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
     returns = trainer.compute_gae(rewards_list, values_list, dones_list, last_value)
     buffer.insert_returns(returns)
     #Compute Belief PPO
-    loss = trainer.update(buffer)
+    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
     # Clean buffer
     buffer.clear()
     # Affichage périodique
@@ -89,3 +90,5 @@ for update in range(1, UPDATE_EPOCHS + 1):
         avg_reward = cumulative_reward / NUM_STEP
         portfolio_val = env.calcul_portfolio_value()
         print(f"| Update {update:4} | Loss: {loss:.4f} | Avg Reward: {avg_reward:.4f} | Portfolio: ${portfolio_val:.2f} |")
+    writter.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy)
+

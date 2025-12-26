@@ -4,7 +4,23 @@ import torch.optim as optim
 import numpy as np
 from .buffer import Buffer
 from .model import Agent
+from torch.utils.tensorboard import SummaryWritter
 
+# Class for TensorBoard
+class Writter:
+    def __init__(self, path:str):
+        self.writter = SummaryWritter(log_dir=path)
+
+    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float):
+        self.writter.add_scaler("Policy Loss", policy_loss, step)
+        self.writter.add_scaler("Critic Loss", critic_loss, step)
+        self.writter.add_scaler("Critic Loss", belief_loss, step)
+        self.writter.add_scaler("Entropy Loss", entropy_loss, step)
+        self.writter.add_scaler("Loss", loss, step)
+
+    def close(self): self.writter.close()
+
+# Belief PPO Implementation
 class PPOTrainer:
     def __init__(self, model:Agent, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, ent_coef:float=0.01):
         self.model = model
@@ -63,9 +79,10 @@ class PPOTrainer:
                        (self.value_coef * value_loss) + \
                        (self.belief_coef * belief_loss) - \
                        (self.ent_coef * dist_entropy.mean())
+
                 # Backpropagation
                 self.optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
-        return loss.item()
+        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.item()
