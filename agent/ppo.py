@@ -20,8 +20,9 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards:list(float), values:list(float), last_value:float, dones:list(float)):
-        values= values + [last_value]
+    def compute_gae(self, rewards:np.array, values:np.array, last_value:float, dones:list(float)) -> np.array:
+        values = values.tolist() + [last_value]
+        rewards = rewards.tolist()
         returns: list(float) = []
         gae: float = 0.0
         for step in reversed(range(len(rewards))):
@@ -31,12 +32,12 @@ class PPOTrainer:
             returns.insert(0,  gae + values[step])
         return returns
 
-    # Update network weights
-    def update(self, memory: Buffer, batch_size:int=64, epochs:int=4):
+    # Compute Belief PPO and Update network weights
+    def update(self, memory:Buffer, batch_size:int=64, epochs:int=4):
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, advantages, target_regimes = memory
+        micro_states, macro_states, actions, old_log_probs, returns, target_regimes = memory.get_all()
         # Normalize the advantages
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        advantages = (returns - returns.mean()) / (returns.std() + 1e-8)
         dataset_size = len(actions)
         indices = np.arange(0, dataset_size, batch_size)
         for _ in range(epochs):
@@ -46,7 +47,7 @@ class PPOTrainer:
                 idx = slice(start,end)
                 
                 # Evaluate model again 
-                _, new_log_probs, dist_entropy, new_values, belief_logits, _ = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 ratio = torch.exp(new_log_probs - old_log_probs[idx])
                 # Loss PPO

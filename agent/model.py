@@ -5,7 +5,7 @@ from torch.distributions import Categorical
 import numpy as np
 
 class Agent(nn.Module):
-    def __init__(self, micro_input_dim:int=6, macro_input_dim:int=7, action_dim:int=3, hidden_dim:int=128):
+    def __init__(self, micro_input_dim:int, macro_input_dim:int, action_dim:int, hidden_dim:int=128):
         super(Agent, self).__init__()
         
         # --- Micro Branch---
@@ -39,7 +39,7 @@ class Agent(nn.Module):
             elif 'bias' in name:
                 nn.init.constant_(param, 0.0)
         for layer in [self.macro_layer[0], self.shared_layer[0], self.actor, self.critic, self.belief]:
-            nn.init.orthogonal_(layer.weight, gain=np.sqrt(1))
+            nn.init.orthogonal_(layer.weight, gain=np.sqrt(0.01))
             nn.init.constant_(layer.bias, 0.0)
 
     def forward(self, micro_x:np.array, macro_x:np.array):
@@ -61,5 +61,8 @@ class Agent(nn.Module):
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
         belief_probs = F.softmax(belief_logits, dim=1)
-        belief_entropy = torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=1)
-        return action, log_prob, dist_entropy, value, belief_logits, belief_entropy
+        #log_prob is the probability action
+        #dist_entropy is the entropy Bonus
+        #value is the value for critic 
+        #belief_logits is the probability for belief
+        return action, log_prob, dist_entropy, value, belief_logits

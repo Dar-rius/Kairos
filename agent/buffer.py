@@ -7,40 +7,46 @@ class Buffer:
     1 -> Macro State
     2 -> Action
     3 -> Old Log Probs 
-    4 -> Return
-    5 -> Advantage
+    4 -> Reward
+    5 -> Value
     6 -> Target Regime
-    """
-    def __init__(self, size: int, device:str):
-        self.size = size
-        self.micro_states = torch.zeros((self.size, 24, 6), device, dtype = torch.float32)
-        self.macro_states = torch.zeros((self.size, 7), device, dtype = torch.float32)
-        self.actions = torch.zeros((self.size, 1), device, dtype = torch.int32)
-        self.old_log_probs = torch.zeros((self.size, 1), device, dtype = torch.float32)
-        self.returns = torch.zeros((self.size, 1), device, dtype = torch.float32)
-        self.target_regimes = torch.zeros((self.size, 1), device, dtype = torch.int32)
-        self.slice: int = 0
 
-    def insert_data(self, micro_state: np.array, macro_state: np.array, actions: int, old_log_probs: list,  returns: float, target_regimes:int):
-        self.micro_states[self.slice] = torch.from_numpy(micro_state)
-        self.macro_states[self.slice] = torch.from_numpy(macro_state)
-        self.actions[self.slice] = actions
-        self.old_log_probs[self.slice] = old_log_probs
-        self.returns[self.slice] = returns
-        self.target_regimes[self.slice] = target_regimes
+    Other: Return (Advantage)
+    """
+    def __init__(self, step:int, micro_size:int, macro_size:int):
+        self.step = step
+        self.slice: int = 0
+        self.micro_states = np.zeros((self.step, 24, micro_size), dtype = torch.float32)
+        self.macro_states = np.zeros((self.step, macro_size), dtype = torch.float32)
+        self.actions = np.zeros((self.step, 1), dtype = torch.int32)
+        self.old_log_probs = np.zeros((self.step, 1), dtype = torch.float32)
+        self.returns = np.zeros((self.step, 1), dtype = torch.float32)
+        self.rewards = np.zeros((self.step, 1), dtype = torch.float32)
+        self.values = np.zeros((self.step, 1), dtype=torch.float32)
+        self.dones = np.zeros((self.step, 1), dtype=torch.float32)
+        self.target_regimes = np.zeros((self.step, 1), dtype = torch.int32)
+
+    def insert(self, micro_state: np.array, macro_state: np.array, action: int, old_log_prob: list,  reward: float, value:float, dones:float, target_regime:int):
+        self.micro_states[self.slice] = micro_state
+        self.macro_states[self.slice] = macro_state
+        self.actions[self.slice] = action
+        self.old_log_probs[self.slice] = old_log_prob
+        self.rewards[self.slice] = reward
+        self.values[self.slice] = value
+        self.dones[self.slice] = dones
+        self.target_regimes[self.slice] = target_regime
         self.slice += 1
 
+    def insert_returns(self, returns: list(float)):
+        self.returns[:] = returns 
+    
     # sampling data
-    def sample(self) -> tuple:
+    def get_all(self) -> tuple:
         return (self.micro_states, self.macro_states,
                 self.actions, self.old_log_probs,
-                self.returns, self.target_regimes)
+                self.returns, self.rewards, 
+                self.values, self.dones, self.target_regimes)
 
     # Delete all data
     def clear(self):
-        self.micro_states.zero_()
-        self.macro_states.zero_()
-        self.actions.zero_()
-        self.old_log_probs.zero_()
-        self.returns.zero_()
-        self.target_regimes.zero_()
+        self.slice = 0
