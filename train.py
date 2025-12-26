@@ -1,5 +1,5 @@
 from rl_trade.env import Env
-from agent.ppo import PPOTrainer, Writter
+from agent.ppo import PPOTrainer, Writer
 from agent.buffer import Buffer
 from agent.model import Agent
 from tqdm import tqdm # Barre de progression
@@ -20,10 +20,10 @@ VALUE_COEF = 0.5
 BELIEF_COEF = 0.5
 
 # Load Data
-daily_df = pd.read_csv("./data_off/train_test/norm_price.csv")
-macro_df = pd.read_csv("./data_off/train_test/metric.csv.csv")
-price_series = pd.read_csv("./data_off/train_test/price_close.csv")
-state_series = pd.read_csv("./data_off/train_test/state.csv")
+daily_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
+macro_df = pd.read_csv("./data_off/train_test/metric.csv").iloc[:, 1:]
+price_series = pd.read_csv("./data_off/train_test/price_close.csv")["Close"]
+state_series = pd.read_csv("./data_off/train_test/state.csv")["state"]
 
 ENV_SIZE = 4
 NUM_STEP = 128
@@ -33,10 +33,10 @@ UPDATE_EPOCHS = 4
 env = Env(daily_df, macro_df, price_series, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
-agent = Agent(STATE_DIM[0], STATE_DIM[0], ACTION_DIM).to(DEVICE)
+agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1])
-writter = Writter("./results/")
+writer = Writer("./results/")
 
 # Run env
 micro_obs, macro_obs = env.reset()
@@ -51,7 +51,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         action_masked = env.get_action_mask()
         with torch.no_grad():
-            action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+            action_t, log_prob_t, entropy_t, value_t, belief_logits = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
         action = action_t.item()
         value = value_t.item()
@@ -91,5 +91,5 @@ for update in range(1, UPDATE_EPOCHS + 1):
         avg_reward = cumulative_reward / NUM_STEP
         portfolio_val = env.calcul_portfolio_value()
         print(f"| Update {update:4} | Loss: {loss:.4f} | Avg Reward: {avg_reward:.4f} | Portfolio: ${portfolio_val:.2f} |")
-    writter.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy)
 

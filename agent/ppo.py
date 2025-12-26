@@ -4,21 +4,21 @@ import torch.optim as optim
 import numpy as np
 from .buffer import Buffer
 from .model import Agent
-from torch.utils.tensorboard import SummaryWritter
+from torch.utils.tensorboard import SummaryWriter
 
 # Class for TensorBoard
-class Writter:
+class Writer:
     def __init__(self, path:str):
-        self.writter = SummaryWritter(log_dir=path)
+        self.writer = SummaryWriter(log_dir=path)
 
     def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float):
-        self.writter.add_scaler("Policy Loss", policy_loss, step)
-        self.writter.add_scaler("Critic Loss", critic_loss, step)
-        self.writter.add_scaler("Critic Loss", belief_loss, step)
-        self.writter.add_scaler("Entropy Loss", entropy_loss, step)
-        self.writter.add_scaler("Loss", loss, step)
+        self.writer.add_scaler("Policy Loss", policy_loss, step)
+        self.writer.add_scaler("Critic Loss", critic_loss, step)
+        self.writer.add_scaler("Critic Loss", belief_loss, step)
+        self.writer.add_scaler("Entropy Loss", entropy_loss, step)
+        self.writer.add_scaler("Loss", loss, step)
 
-    def close(self): self.writter.close()
+    def close(self): self.writer.close()
 
 # Belief PPO Implementation
 class PPOTrainer:
@@ -36,7 +36,7 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards:np.array, values:np.array, last_value:float, dones:list(float)) -> np.array:
+    def compute_gae(self, rewards:np.array, values:np.array, last_value:float, dones:list) -> np.array:
         values = values.tolist() + [last_value]
         rewards = rewards.tolist()
         returns: list(float) = []
@@ -45,7 +45,7 @@ class PPOTrainer:
             mask = 1.0 - dones[step]
             delta = rewards[step] + self.gamma * values[step + 1] * mask - values[step]
             gae = delta + self.gamma * self.gae_lambda * mask * gae
-            returns.insert(0,  gae + values[step])
+            returns.insert(0.0,  gae + values[step])
         return returns
 
     # Compute Belief PPO and Update network weights

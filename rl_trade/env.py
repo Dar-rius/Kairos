@@ -21,7 +21,7 @@ class Env:
         self.cost_rate = cost_rate
         self.size = self.macro_trade.shape[0]
         self.seq: int = 24
-        self.observation_space = [6, 7]
+        self.observation_space = [self.hour_trade.shape[1], self.macro_trade.shape[1]]
         self.action_space =  3
 
     def _buy(self):
@@ -59,7 +59,7 @@ class Env:
         mask = [True, True, True]
         if self.total_amount[1] < 1.0: mask[0] = False
         else: mask[2] = False
-        return np.array(mask, dtype=np.bool_)
+        return np.array(mask, dtype=np.bool_).reshape(1,-1)
 
     #Reset the env to 0
     def reset(self):
