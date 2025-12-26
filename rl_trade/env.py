@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from .compute import return_log, calcul_sharpe_ratio, calcul_total_profit, reward_func
 from .processing import concat_df, convert_to_btc, convert_to_usd
 from torch import Tensor
@@ -53,6 +54,12 @@ class Env:
         self.btc_values.append(self.price[self.time[2]])
         self._next()
         return [daily_trades, macro_days]
+
+    def get_action_mask(self) -> np.array:
+        mask = [True, True, True]
+        if self.total_amount[1] < 1.0: mask[0] = False
+        else: mask[2] = False
+        return np.array(mask, dtype=np.bool_)
 
     #Reset the env to 0
     def reset(self):

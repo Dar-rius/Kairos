@@ -61,8 +61,7 @@ class PPOTrainer:
             for start in indices:
                 end = start + batch_size
                 idx = slice(start,end)
-                
-                # Evaluate model again 
+                # Evaluate model again
                 _, new_log_probs, dist_entropy, new_values, belief_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 ratio = torch.exp(new_log_probs - old_log_probs[idx])

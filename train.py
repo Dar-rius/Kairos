@@ -49,8 +49,9 @@ for update in range(1, UPDATE_EPOCHS + 1):
         global_step += 1
         micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        action_masked = env.get_action_mask()
         with torch.no_grad():
-            action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t)
+            action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
         action = action_t.item()
         value = value_t.item()
