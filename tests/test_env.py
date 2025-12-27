@@ -13,7 +13,7 @@ prob = torch.zeros([1], dtype=torch.float32)
 def test_reset():
     env = Env(daily_trade=df, macro_trade=df_1, price=price)
     tab1, tab2 = env.reset()
-    daily_trades = df[0:24].to_numpy()
+    daily_trades = df[0:23].to_numpy()
     macro_trades =  df_1.loc[0].to_numpy()
     np.testing.assert_equal(daily_trades, tab1)
     np.testing.assert_equal(macro_trades, tab2)

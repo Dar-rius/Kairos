@@ -11,7 +11,7 @@ def reward_func(return_: float, cost_rate: float, action: int, entropy_b: Tensor
     entropy_b = entropy_b.item()
     # Compute the micro strategy for trading 1h
     first_micro = return_ * action
-    second_micro = cost_rate * abs(action)
+    second_micro = calcul_cost(abs(action), cost_rate)
     micro_strat = first_micro - second_micro
     # Compute the macro strategy for detect the state of market
     first_macro = BETA * abs(action)
@@ -37,11 +37,11 @@ def calcul_sharpe_ratio(data_p: list[float], data_btc: list[float]) -> float:
         return 0.0
     return sr.item()
 
-def compute_cost(amount: float, cost_rate: float): return amount * cost_rate
+def calcul_cost(amount: float, cost_rate: float): return amount * cost_rate
 
 def compute_entropy(prob: list[float]): return entropy(prob, base=2)
 
-def calcul_total_profit(precedent_tp: float, now_tp: float): return precedent_tp - now_tp
+def profit_and_loss(total_price:list): return  total_price[2] - total_price[3]
 
 #Compute the return log
 def return_log(current: float, previous: float): return math.log(current / previous)

@@ -1,6 +1,5 @@
 /rl_trade/__pycache__
 /tests/__pycache__
-/agent/__pycache__
 /__pycache__
 *.csv
-/results
+/agent/__pycache__

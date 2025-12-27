@@ -36,7 +36,7 @@ STATE_DIM = env.observation_space
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1], DEVICE)
-writer = Writer("./results/")
+writer = Writer("./runs/train/")
 
 # Run env
 micro_obs, macro_obs = env.reset()
@@ -44,6 +44,7 @@ global_step = 0
 # Training Loop
 for update in range(1, UPDATE_EPOCHS + 1):
     cumulative_reward = 0
+    cumulative_pnl = 0
     # Collecte phase
     for step in tqdm(range(NUM_STEP)):
         global_step += 1
@@ -68,6 +69,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
             target_regime=target_regime
         )
         cumulative_reward += reward
+        cumulative_pnl += env.get_pnl()
         if done: break
         micro_obs, macro_obs = next_obs # next_obs est un tuple (micro, macro)
     # Optimisation phase
@@ -91,5 +93,5 @@ for update in range(1, UPDATE_EPOCHS + 1):
         avg_reward = cumulative_reward / NUM_STEP
         portfolio_val = env.calcul_portfolio_value()
         print(f"| Update {update:4} | Loss: {loss:.4f} | Avg Reward: {avg_reward:.4f} | Portfolio: ${portfolio_val:.2f} |")
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
 writer.close()
