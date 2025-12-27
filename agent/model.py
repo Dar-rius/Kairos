@@ -62,8 +62,10 @@ class Agent(nn.Module):
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
         belief_probs = F.softmax(belief_logits, dim=1)
+        belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=1)
         #log_prob is the probability action
         #dist_entropy is the entropy Bonus
         #value is the value for critic
         #belief_probs is the probability for belief
-        return action, log_prob, dist_entropy, value, belief_probs
+        #belief_entropy
+        return action, log_prob, dist_entropy, value, belief_logits, belief_entropy

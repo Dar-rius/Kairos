@@ -1,4 +1,5 @@
 import torch
+from torch import Tensor
 import numpy as np
 
 class Buffer:
@@ -13,20 +14,21 @@ class Buffer:
 
     Other: Return (Advantage)
     """
-    def __init__(self, step:int, micro_size:int, macro_size:int):
+    def __init__(self, step:int, micro_size:int, macro_size:int, device:str):
         self.step = step
         self.slice: int = 0
-        self.micro_states = np.zeros((self.step, 23, micro_size))
-        self.macro_states = np.zeros((self.step, macro_size))
-        self.actions = np.zeros((self.step, 1))
-        self.old_log_probs = np.zeros((self.step, 1))
-        self.returns = np.zeros((self.step, 1))
+        self.device = device
+        self.micro_states = torch.zeros((self.step, 23, micro_size), device=self.device)
+        self.macro_states = torch.zeros((self.step, macro_size), device=self.device)
+        self.actions = torch.zeros((self.step, 1), device=self.device)
+        self.old_log_probs = torch.zeros((self.step, 1), device=self.device)
+        self.returns = torch.zeros((self.step, 1), device=self.device)
         self.rewards = np.zeros((self.step, 1))
         self.values = np.zeros((self.step, 1))
         self.dones = np.zeros((self.step, 1))
-        self.target_regimes = np.zeros((self.step, 1))
+        self.target_regimes = torch.zeros((self.step, 1), device=self.device)
 
-    def insert(self, micro_state: np.array, macro_state: np.array, action: int, old_log_prob: list,  reward: float, value:float, dones:float, target_regime:int):
+    def insert(self, micro_state: Tensor, macro_state: Tensor, action: int, old_log_prob: list,  reward: float, value:float, dones:float, target_regime:int):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
         self.actions[self.slice] = action
@@ -38,7 +40,8 @@ class Buffer:
         self.slice += 1
 
     def insert_returns(self, returns: list):
-        self.returns[:] = returns 
+        tensor_returns = torch.as_tensor(returns, device=self.device)
+        self.returns[:] = tensor_returns
     
     # sampling data
     def get_all(self) -> tuple:

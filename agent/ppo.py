@@ -11,12 +11,13 @@ class Writer:
     def __init__(self, path:str):
         self.writer = SummaryWriter(log_dir=path)
 
-    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float):
-        self.writer.add_scaler("Policy Loss", policy_loss, step)
-        self.writer.add_scaler("Critic Loss", critic_loss, step)
-        self.writer.add_scaler("Critic Loss", belief_loss, step)
-        self.writer.add_scaler("Entropy Loss", entropy_loss, step)
-        self.writer.add_scaler("Loss", loss, step)
+    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float):
+        self.writer.add_scalar("Policy Loss", policy_loss, step)
+        self.writer.add_scalar("Critic Loss", critic_loss, step)
+        self.writer.add_scalar("Critic Loss", belief_loss, step)
+        self.writer.add_scalar("Entropy Loss", entropy_loss, step)
+        self.writer.add_scalar("Loss", loss, step)
+        self.writer.add_scalar("Reward", reward, step)
 
     def close(self): self.writer.close()
 
@@ -36,22 +37,22 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards:np.array, values:np.array, last_value:float, dones:list) -> np.array:
-        values = values.tolist() + [last_value]
-        rewards = rewards.tolist()
+    def compute_gae(self, rewards:list, values:list, last_value:float, dones:list) -> np.array:
+        values = values + [last_value]
         returns: list(float) = []
         gae: float = 0.0
         for step in reversed(range(len(rewards))):
             mask = 1.0 - dones[step]
             delta = rewards[step] + self.gamma * values[step + 1] * mask - values[step]
             gae = delta + self.gamma * self.gae_lambda * mask * gae
-            returns.insert(0.0,  gae + values[step])
+            returns.insert(0,  gae + values[step])
+        returns = np.array(returns).reshape(-1,1)
         return returns
 
     # Compute Belief PPO and Update network weights
     def update(self, memory:Buffer, batch_size:int=64, epochs:int=4):
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, target_regimes = memory.get_all()
+        micro_states, macro_states, actions, old_log_probs, returns, _, _, _, target_regimes = memory.get_all()
         # Normalize the advantages
         advantages = (returns - returns.mean()) / (returns.std() + 1e-8)
         dataset_size = len(actions)
@@ -62,7 +63,7 @@ class PPOTrainer:
                 end = start + batch_size
                 idx = slice(start,end)
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, belief_entropy = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 ratio = torch.exp(new_log_probs - old_log_probs[idx])
                 # Loss PPO
@@ -72,7 +73,7 @@ class PPOTrainer:
                 # Loss Value (Critic) - MSE
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx])
                 # Loss Belief (Auxiliary) - Cross Entropy
-                belief_loss = self.ce_loss(belief_logits, target_regimes[idx])
+                belief_loss = self.ce_loss(belief_logits, target_regimes[idx].view(-1).long())
                 # Total Loss
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
@@ -84,4 +85,4 @@ class PPOTrainer:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
-        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.item()
+        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.mean().item()

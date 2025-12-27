@@ -71,7 +71,7 @@ class Env:
         state = self.new_state()
         state_pred = self.state_pred[self.time[0]] if self.state_pred is not None else None
         self.portfolio_values.append(self.calcul_portfolio_value())
-        if action  == -1:
+        if action  == 2:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
             self._sell()
@@ -86,4 +86,5 @@ class Env:
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         #Compute the reward
         reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
+        print(reward)
         return (state, reward, state_pred, done)

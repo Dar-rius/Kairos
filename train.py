@@ -35,7 +35,7 @@ ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
-buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1])
+buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./results/")
 
 # Run env
@@ -51,15 +51,15 @@ for update in range(1, UPDATE_EPOCHS + 1):
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         action_masked = env.get_action_mask()
         with torch.no_grad():
-            action_t, log_prob_t, entropy_t, value_t, belief_logits = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+            action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
         action = action_t.item()
         value = value_t.item()
         log_prob = log_prob_t.item()
-        next_obs, reward, target_regime, done = env.step(action, entropy_t)
+        next_obs, reward, target_regime, done = env.step(action, belief_entropy)
         buffer.insert(
-            micro_state=micro_obs,
-            macro_state=macro_obs,
+            micro_state=micro_t,
+            macro_state=macro_t,
             action=action_t.item(),
             old_log_prob=log_prob_t.item(),
             reward=reward,
@@ -80,7 +80,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
     rewards_list = buffer.rewards.flatten().tolist()
     values_list = buffer.values.flatten().tolist()
     dones_list = buffer.dones.flatten().tolist()
-    returns = trainer.compute_gae(rewards_list, values_list, dones_list, last_value)
+    returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
     buffer.insert_returns(returns)
     #Compute Belief PPO
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
@@ -91,5 +91,5 @@ for update in range(1, UPDATE_EPOCHS + 1):
         avg_reward = cumulative_reward / NUM_STEP
         portfolio_val = env.calcul_portfolio_value()
         print(f"| Update {update:4} | Loss: {loss:.4f} | Avg Reward: {avg_reward:.4f} | Portfolio: ${portfolio_val:.2f} |")
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy)
-
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward)
+writer.close()
