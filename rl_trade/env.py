@@ -8,8 +8,8 @@ from torch import Tensor
 class Env:
     def __init__(self, daily_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001):
         self.portfolio_values: list[float] = []
-        # Total Profit [buy_price, pnl_brut, fees, pnl]
-        self.total_price: list = [0.0, 0.0, 0.0, 0.0] 
+        # Total Profit [buy_price, pnl_brut, fees, pnl_final]
+        self.total_pnl: list = [0.0, 0.0, 0.0, 0.0]
         self.btc_values: list[float] = []
         self.historic_data = pd.DataFrame(data = {'action':list[int], 'portfolio': list[float]})
         self.reward: float = 0
@@ -24,23 +24,23 @@ class Env:
         self.size = self.macro_trade.shape[0]
         self.seq: int = 24
         self.observation_space = [self.hour_trade.shape[1], self.macro_trade.shape[1]]
-        self.action_space =  3
+        self.action_space = 3
 
     def _buy(self):
         cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
         usd_price = self.total_amount[0] - cost_fees
         self.total_amount[1] = convert_to_btc(usd_price, self.btc_values[-1])
-        self.total_price[0] = self.total_amount[0]
-        self.total_price[2] = cost_fees
+        self.total_pnl[0] = self.total_amount[0]
+        self.total_pnl[2] = cost_fees
         self.total_amount[0] = 0
         
     def _sell(self):
         usd_price = convert_to_usd(self.total_amount[1], self.btc_values[-1])
         cost_fees = calcul_cost(usd_price, self.cost_rate)
         self.total_amount[0] =  usd_price - cost_fees
-        self.total_price[1] = usd_price - self.total_price[0]
-        self.total_price[2] += cost_fees
-        self.total_price[3] = profit_and_loss(self.total_price)
+        self.total_pnl[1] = usd_price - self.total_pnl[0]
+        self.total_pnl[2] += cost_fees
+        self.total_pnl[3] = profit_and_loss(self.total_pnl)
         self.total_amount[1] = 0
 
     def _all_reset(self):
@@ -55,7 +55,7 @@ class Env:
             self.time[0] += 1
             self.seq = 0
 
-    def get_pnl(self): return self.total_price[3]
+    def get_pnl(self): return self.total_pnl[3]
 
     def calcul_portfolio_value(self) -> float:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_values[-1])

@@ -51,7 +51,7 @@ class PPOTrainer:
         return returns
 
     # Compute Belief PPO and Update network weights
-    def update(self, memory:Buffer, batch_size:int=64, epochs:int=4):
+    def update(self, memory:Buffer, batch_size:int=64, epochs:int=10):
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
         micro_states, macro_states, actions, old_log_probs, returns, _, _, _, target_regimes = memory.get_all()
         # Normalize the advantages
@@ -72,7 +72,7 @@ class PPOTrainer:
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages[idx]
                 policy_loss = -torch.min(surr1, surr2).mean()
                 # Loss Value (Critic) - MSE
-                value_loss = self.mse_loss(new_values.flatten(), returns[idx])
+                value_loss = self.mse_loss(new_values, returns[idx])
                 # Loss Belief (Auxiliary) - Cross Entropy
                 belief_loss = self.ce_loss(belief_logits, target_regimes[idx].view(-1).long())
                 # Total Loss

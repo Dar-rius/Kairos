@@ -24,15 +24,15 @@ daily_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
 macro_df = pd.read_csv("./data_off/train_test/metric.csv").iloc[:, 1:]
 price_series = pd.read_csv("./data_off/train_test/price_close.csv")["Close"]
 state_series = pd.read_csv("./data_off/train_test/state.csv")["state"]
-
-ENV_SIZE = 4
-NUM_STEP = 128
-#BATCH_SIZE = 64
-UPDATE_EPOCHS = 4
  
 env = Env(daily_df, macro_df, price_series, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
+ENV_SIZE = 4
+NUM_STEP = 128
+#BATCH_SIZE = 64
+UPDATE_EPOCHS =  macro_df.shape[0] // NUM_STEP
+print(macro_df.shape[0])
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1], DEVICE)
@@ -88,10 +88,8 @@ for update in range(1, UPDATE_EPOCHS + 1):
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
     # Clean buffer
     buffer.clear()
-    # Affichage périodique
-    if update % 10 == 0:
-        avg_reward = cumulative_reward / NUM_STEP
-        portfolio_val = env.calcul_portfolio_value()
-        print(f"| Update {update:4} | Loss: {loss:.4f} | Avg Reward: {avg_reward:.4f} | Portfolio: ${portfolio_val:.2f} |")
     writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
+
+#Save model
+torch.save(agent.state_dict(), './agent/save/agent_saved.pt')
 writer.close()
