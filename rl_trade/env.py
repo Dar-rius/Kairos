@@ -6,20 +6,20 @@ from torch import Tensor
 
 # ******* ENV **********
 class Env:
-    def __init__(self, daily_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001):
-        self.portfolio_values: list[float] = []
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, rollout_steps:int, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001):
+        self.init_usd_amount = amount_usd
+        self.rollout_steps = rollout_steps
         # Total Profit [buy_price, pnl_brut, fees, pnl_final]
         self.total_pnl: list = [0.0, 0.0, 0.0, 0.0]
         self.btc_values: list[float] = []
         self.historic_data = pd.DataFrame(data = {'action':list[int], 'portfolio': list[float]})
-        self.reward: float = 0
-        self.hour_trade = daily_trade.to_numpy()
+        self.hour_trade = hour_trade.to_numpy()
         self.macro_trade = macro_trade.to_numpy()
         self.state_pred = state_pred.to_numpy() if state_pred is not None else None
         self.price = price.to_numpy()
         self.time = [0, 0, 23]
-        self.metric = pd.DataFrame(data={'date':[], "sharpe ratio": [], "tp": []})
-        self.total_amount: dict = {0: amount_usd, 1: 0.0}
+        #self.metric = pd.DataFrame(data={'date':[], "sharpe ratio": [], "tp": []})
+        self.total_amount: dict = {0: self.init_usd_amount, 1: 0.0}
         self.cost_rate = cost_rate
         self.size = self.macro_trade.shape[0]
         self.seq: int = 24
@@ -33,19 +33,30 @@ class Env:
         self.total_pnl[0] = self.total_amount[0]
         self.total_pnl[2] = cost_fees
         self.total_amount[0] = 0
-        
+
     def _sell(self):
         usd_price = convert_to_usd(self.total_amount[1], self.btc_values[-1])
         cost_fees = calcul_cost(usd_price, self.cost_rate)
         self.total_amount[0] =  usd_price - cost_fees
-        self.total_pnl[1] = usd_price - self.total_pnl[0]
         self.total_pnl[2] += cost_fees
+        self.total_pnl[1] = usd_price - self.total_pnl[0]
         self.total_pnl[3] = profit_and_loss(self.total_pnl)
         self.total_amount[1] = 0
 
     def _all_reset(self):
-        self.time = [0, 0, 23]
+        min_steps_left = self.rollout_steps
+        max_macro_idx = self.size - (min_steps_left // 24) - 1
+        random_day = np.random.randint(0, max_macro_idx) if max_macro_idx > 0 else 0
+        # Synchronised the Micro and Macro index
+        micro_start = random_day * 24
+        micro_end = micro_start + 23
+        self.time = [random_day, micro_start, micro_end]
         self.seq = 0
+        # Reset Portfolio Value 
+        self.total_amount = {0: self.init_usd_amount, 1: 0.0}
+        self.total_pnl = [0.0, 0.0, 0.0, 0.0] # Reset PnL
+        self.btc_values = []
+        self.historic_data = pd.DataFrame(data={'action':[], 'portfolio': []})
 
     def _next(self):
         self.time[1] += 1
@@ -70,8 +81,8 @@ class Env:
 
     def get_action_mask(self) -> np.array:
         mask = [True, True, True]
-        if self.total_amount[1] < 1.0: mask[0] = False
-        else: mask[2] = False
+        if self.total_amount[1] < 1.0: mask[2] = False
+        else: mask[1] = False
         return np.array(mask, dtype=np.bool_).reshape(1,-1)
 
     #Reset the env to 0
@@ -82,10 +93,9 @@ class Env:
     #The next step of env
     def step(self, action: int, entropy_b: Tensor) -> tuple:
         state = self.new_state()
-        state_pred = self.state_pred[self.time[0]] if self.state_pred is not None else None
-        self.portfolio_values.append(self.calcul_portfolio_value())
+        state_pred = self.state_pred[self.time[0]+1] if self.state_pred is not None else None
         # Sell
-        if action  == 2:
+        if action == 2:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
             self._sell()
@@ -99,7 +109,8 @@ class Env:
             trade_info = [action, self.calcul_portfolio_value()]
             self.historic_data = concat_df(self.historic_data,  trade_info)
         return_ = return_log(self.btc_values[-1], self.btc_values[-2]) if len(self.btc_values) > 1 else 0
-        done = True if self.time[2] > self.hour_trade.shape[0] else False
+        done = True if self.time[2] == self.hour_trade.shape[0] else False
+        truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
         reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
-        return (state, reward, state_pred, done)
+        return (state, reward, state_pred, truncate, done)

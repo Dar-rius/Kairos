@@ -20,33 +20,33 @@ VALUE_COEF = 0.5
 BELIEF_COEF = 0.5
 
 # Load Data
-daily_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
+hour_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
 macro_df = pd.read_csv("./data_off/train_test/metric.csv").iloc[:, 1:]
 price_series = pd.read_csv("./data_off/train_test/price_close.csv")["Close"]
 state_series = pd.read_csv("./data_off/train_test/state.csv")["state"]
  
-env = Env(daily_df, macro_df, price_series, state_series)
+TOTAL_TIMESTAMP = 1000000
+BATCH_SIZE = 64
+ROLLOUT_STEPS = 2048
+NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
+env = Env(hour_df, macro_df, price_series, ROLLOUT_STEPS, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
-ENV_SIZE = 4
-NUM_STEP = 128
-#BATCH_SIZE = 64
-UPDATE_EPOCHS =  macro_df.shape[0] // NUM_STEP
-print(macro_df.shape[0])
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
-buffer = Buffer(NUM_STEP, STATE_DIM[0], STATE_DIM[1], DEVICE)
+buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
 
 # Run env
 micro_obs, macro_obs = env.reset()
 global_step = 0
 # Training Loop
-for update in range(1, UPDATE_EPOCHS + 1):
-    cumulative_reward = 0
-    cumulative_pnl = 0
+for update in range(1, NUM_UPDATE + 1):
+    cumulative_reward: float = 0.0
+    cumulative_pnl: float = env.get_pnl()
+    portfolio_value: float = env.calcul_portfolio_value()
     # Collecte phase
-    for step in tqdm(range(NUM_STEP)):
+    for step in tqdm(range(ROLLOUT_STEPS)):
         global_step += 1
         micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
@@ -57,7 +57,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
         action = action_t.item()
         value = value_t.item()
         log_prob = log_prob_t.item()
-        next_obs, reward, target_regime, done = env.step(action, belief_entropy)
+        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
         buffer.insert(
             micro_state=micro_t,
             macro_state=macro_t,
@@ -70,8 +70,11 @@ for update in range(1, UPDATE_EPOCHS + 1):
         )
         cumulative_reward += reward
         cumulative_pnl += env.get_pnl()
-        if done: break
-        micro_obs, macro_obs = next_obs # next_obs est un tuple (micro, macro)
+        portfolio_value = env.calcul_portfolio_value()
+        if done or truncate:
+            micro_obs, macro_obs = env.reset()
+        else:
+            micro_obs, macro_obs = next_obs
     # Optimisation phase
     with torch.no_grad():
         next_micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
@@ -88,7 +91,7 @@ for update in range(1, UPDATE_EPOCHS + 1):
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
     # Clean buffer
     buffer.clear()
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, portfolio_value)
 
 #Save model
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')

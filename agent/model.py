@@ -22,25 +22,32 @@ class Agent(nn.Module):
         
         # --- 3. Fusion ---
         self.shared_layer = nn.Sequential(
-            nn.Linear(hidden_dim + 32, 64),
+            nn.Linear(hidden_dim + 32, 256),
+            nn.ReLU(),
+            nn.Linear(256, hidden_dim),
             nn.ReLU())
         
         # --- 4. Heads ---
-        self.actor = nn.Linear(64, action_dim)
-        self.critic = nn.Linear(64, 1)
-        self.belief = nn.Linear(64, 3)
+        self.actor = nn.Linear(128, action_dim)
+        self.critic = nn.Linear(128, 1)
+        self.belief = nn.Linear(128, 3)
         self._init_weights()
 
     def _init_weights(self):
         # Initialize LSTM
         for name, param in self.lstm.named_parameters():
             if 'weight' in name:
-                nn.init.orthogonal_(param, gain=np.sqrt(1))
+                nn.init.orthogonal_(param, gain=1.0)
             elif 'bias' in name:
                 nn.init.constant_(param, 0.0)
-        for layer in [self.macro_layer[0], self.shared_layer[0], self.actor, self.critic, self.belief]:
-            nn.init.orthogonal_(layer.weight, gain=np.sqrt(0.01))
+        for layer in [self.macro_layer[0], self.shared_layer[0]]:
+            nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
             nn.init.constant_(layer.bias, 0.0)
+        for layer in [self.critic, self.belief, self.actor]:
+            nn.init.orthogonal_(layer.weight, gain=1.0)
+            nn.init.constant_(layer.bias, 0.0)
+        nn.init.orthogonal_(self.actor.weight, gain=0.01)
+        nn.init.constant_(self.actor.bias, 0.0)
 
     def forward(self, micro_x:np.array, macro_x:np.array):
         _, (h_n, _) = self.lstm(micro_x)
