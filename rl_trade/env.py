@@ -2,11 +2,12 @@ import pandas as pd
 import numpy as np
 from .compute import return_log, calcul_cost, calcul_sharpe_ratio, profit_and_loss, reward_func
 from .processing import concat_df, convert_to_btc, convert_to_usd
+import torch
 from torch import Tensor
 
 # ******* ENV **********
 class Env:
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, rollout_steps:int, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, rollout_steps:int, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.init_usd_amount = amount_usd
         self.rollout_steps = rollout_steps
         # Total Profit [buy_price, pnl_brut, fees, pnl_final]
@@ -25,6 +26,7 @@ class Env:
         self.seq: int = 24
         self.observation_space = [self.hour_trade.shape[1], self.macro_trade.shape[1]]
         self.action_space = 3
+        self.device = device
 
     def _buy(self):
         cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
@@ -79,11 +81,11 @@ class Env:
         self._next()
         return [daily_trades, macro_days]
 
-    def get_action_mask(self) -> np.array:
+    def get_action_mask(self) -> Tensor:
         mask = [True, True, True]
         if self.total_amount[1] < 1.0: mask[2] = False
         else: mask[1] = False
-        return np.array(mask, dtype=np.bool_).reshape(1,-1)
+        return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
     #Reset the env to 0
     def reset(self):
@@ -93,7 +95,8 @@ class Env:
     #The next step of env
     def step(self, action: int, entropy_b: Tensor) -> tuple:
         state = self.new_state()
-        state_pred = self.state_pred[self.time[0]+1] if self.state_pred is not None else None
+        future_idx = min(self.time[0] + 1, self.size - 1)
+        state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
         # Sell
         if action == 2:
             trade_info = [action, self.calcul_portfolio_value()]

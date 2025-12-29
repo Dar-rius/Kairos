@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import pandas as pd
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
@@ -24,7 +24,7 @@ hour_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
 macro_df = pd.read_csv("./data_off/train_test/metric.csv").iloc[:, 1:]
 price_series = pd.read_csv("./data_off/train_test/price_close.csv")["Close"]
 state_series = pd.read_csv("./data_off/train_test/state.csv")["state"]
- 
+
 TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
@@ -41,7 +41,7 @@ writer = Writer("./runs/train/")
 micro_obs, macro_obs = env.reset()
 global_step = 0
 # Training Loop
-for update in range(1, NUM_UPDATE + 1):
+for update in tqdm(range(1, NUM_UPDATE + 1)):
     cumulative_reward: float = 0.0
     cumulative_pnl: float = env.get_pnl()
     portfolio_value: float = env.calcul_portfolio_value()
