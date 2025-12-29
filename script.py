@@ -8,6 +8,11 @@ metric_train = pd.read_csv("./data_off/train_test/metric_train.csv")
 price_test = pd.read_csv("./data_off/train_test/price_test.csv")
 metric_test = pd.read_csv("./data_off/train_test/metric_test.csv")
 #Transform str to int in state variable
+print(price_train.shape[0])
+assert price_train.shape[0] == 70080
+assert price_test.shape[0] == 11640
+assert metric_train.shape[0] == 2920
+assert metric_test.shape[0] == 485
 regime_mapping = {
         "Stable": 0,
         "Volatility": 1,
@@ -29,19 +34,23 @@ state_unit_test = df_metric["state"].loc[0:50]
 state_unit_test.to_csv("./data_off/unit_test/state.csv")
 
 # Train for norm price
-price_train["Close"].to_csv("./data_off/train_test/price_close_train.csv")
-price_train =  norm_price.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
+close_train = price_train["Close"]
+close_train.to_csv("./data_off/train_test/price_close_train.csv")
+price_train =  price_train.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
 price_train.to_csv("./data_off/train_test/price_train.csv")
 # Test for norm price
-price_test["Close"].to_csv("./data_off/train_test/price_close_test.csv")
-price_test =  norm_price.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
+close_test = price_test["Close"]
+close_test.to_csv("./data_off/train_test/price_close_test.csv")
+price_test =  price_test.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
 price_test.to_csv("./data_off/train_test/price_test.csv")
 
 # Train form metric
-metric_train["state"].to_csv("./data_off/train_test/state_train.csv")
+state_train = metric_train["state"]
+state_train.to_csv("./data_off/train_test/state_train.csv")
 metric_train = metric_train.drop(["date", "state"], axis=1)
 metric_train.to_csv("./data_off/train_test/metric_train.csv")
 # Test form metric
-metric_test["state"].to_csv("./data_off/train_test/state_test.csv")
+state_test = metric_test["state"]
+state_test.to_csv("./data_off/train_test/state_test.csv")
 metric_test = metric_test.drop(["date", "state"], axis=1)
-metric_test.to_csv("./data_off/train_test/metric_train.csv")
+metric_test.to_csv("./data_off/train_test/metric_test.csv")
