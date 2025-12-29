@@ -29,7 +29,7 @@ TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
-env = Env(hour_df, macro_df, price_series, ROLLOUT_STEPS, state_series)
+env = Env(hour_df, macro_df, price_series, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
@@ -43,8 +43,7 @@ global_step = 0
 # Training Loop
 for update in tqdm(range(1, NUM_UPDATE + 1)):
     cumulative_reward: float = 0.0
-    cumulative_pnl: float = env.get_pnl()
-    portfolio_value: float = env.calcul_portfolio_value()
+    cumulative_pnl: float = 0.0
     # Collecte phase
     for step in tqdm(range(ROLLOUT_STEPS)):
         global_step += 1
@@ -91,7 +90,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
     # Clean buffer
     buffer.clear()
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, portfolio_value)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
 
 #Save model
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')

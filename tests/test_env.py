@@ -12,7 +12,7 @@ state_p = pd.read_csv("./data_off/unit_test/state.csv")["state"]
 prob = torch.zeros([1], dtype=torch.float32)
 
 def test_reset():
-    env = Env(hour_trade=df, macro_trade=df_1, price=price, state_pred=state_p, rollout_steps=2048)
+    env = Env(hour_trade=df, macro_trade=df_1, price=price, state_pred=state_p)
     tab1, tab2 = env.reset()
     daily_trades = df[0:23].to_numpy()
     macro_trades =  df_1.loc[0].to_numpy()
@@ -20,13 +20,13 @@ def test_reset():
     np.testing.assert_equal(macro_trades, tab2)
 
 def test_calcul_portfolio_value():
-    env = Env(hour_trade=df, macro_trade=df_1, price=price, rollout_steps=2048)
+    env = Env(hour_trade=df, macro_trade=df_1, price=price)
     result = env.calcul_portfolio_value()
     assert result == 100000.0
 
 # Test all case of action
 class TestStep:
-    env = Env(hour_trade=df, macro_trade=df_1, price=price, state_pred=state_p, rollout_steps=2048)
+    env = Env(hour_trade=df, macro_trade=df_1, price=price, state_pred=state_p)
     env.reset()
 
     def test_buy(self):

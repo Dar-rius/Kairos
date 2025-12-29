@@ -7,9 +7,8 @@ from torch import Tensor
 
 # ******* ENV **********
 class Env:
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, rollout_steps:int, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.init_usd_amount = amount_usd
-        self.rollout_steps = rollout_steps
         # Total Profit [buy_price, pnl_brut, fees, pnl_final]
         self.total_pnl: list = [0.0, 0.0, 0.0, 0.0]
         self.btc_values: list[float] = []
@@ -46,7 +45,7 @@ class Env:
         self.total_amount[1] = 0
 
     def _all_reset(self):
-        min_steps_left = self.rollout_steps
+        min_steps_left = 500
         max_macro_idx = self.size - (min_steps_left // 24) - 1
         random_day = np.random.randint(0, max_macro_idx) if max_macro_idx > 0 else 0
         # Synchronised the Micro and Macro index
