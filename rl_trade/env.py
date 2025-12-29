@@ -12,7 +12,6 @@ class Env:
         # Total Profit [buy_price, pnl_brut, fees, pnl_final]
         self.total_pnl: list = [0.0, 0.0, 0.0, 0.0]
         self.btc_values: list[float] = []
-        self.historic_data = pd.DataFrame(data = {'action':list[int], 'portfolio': list[float]})
         self.hour_trade = hour_trade.to_numpy()
         self.macro_trade = macro_trade.to_numpy()
         self.state_pred = state_pred.to_numpy() if state_pred is not None else None
@@ -97,19 +96,9 @@ class Env:
         future_idx = min(self.time[0] + 1, self.size - 1)
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
         # Sell
-        if action == 2:
-            trade_info = [action, self.calcul_portfolio_value()]
-            self.historic_data = concat_df(self.historic_data,  trade_info)
-            self._sell()
+        if action == 2: self._sell()
         # Buy
-        elif action == 1:
-            trade_info = [action, self.calcul_portfolio_value()]
-            self.historic_data = concat_df(self.historic_data,  trade_info)
-            self._buy()
-        # Hold
-        else:
-            trade_info = [action, self.calcul_portfolio_value()]
-            self.historic_data = concat_df(self.historic_data,  trade_info)
+        elif action == 1: self._buy()
         return_ = return_log(self.btc_values[-1], self.btc_values[-2]) if len(self.btc_values) > 1 else 0
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False

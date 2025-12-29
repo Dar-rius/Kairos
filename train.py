@@ -20,10 +20,10 @@ VALUE_COEF = 0.5
 BELIEF_COEF = 0.5
 
 # Load Data
-hour_df = pd.read_csv("./data_off/train_test/norm_price.csv").iloc[:, 1:]
-macro_df = pd.read_csv("./data_off/train_test/metric.csv").iloc[:, 1:]
-price_series = pd.read_csv("./data_off/train_test/price_close.csv")["Close"]
-state_series = pd.read_csv("./data_off/train_test/state.csv")["state"]
+hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
+macro_df = pd.read_csv("./data_off/train_test/metric_train.csv").iloc[:, 1:]
+price_series = pd.read_csv("./data_off/train_test/price_close_train.csv")["Close"]
+state_series = pd.read_csv("./data_off/train_test/state_train.csv")["state"]
 
 TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 64

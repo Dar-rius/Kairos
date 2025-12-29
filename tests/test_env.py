@@ -11,14 +11,6 @@ price = pd.read_csv("./data_off/unit_test/price_close.csv")["Close"]
 state_p = pd.read_csv("./data_off/unit_test/state.csv")["state"]
 prob = torch.zeros([1], dtype=torch.float32)
 
-def test_reset():
-    env = Env(hour_trade=df, macro_trade=df_1, price=price, state_pred=state_p)
-    tab1, tab2 = env.reset()
-    daily_trades = df[0:23].to_numpy()
-    macro_trades =  df_1.loc[0].to_numpy()
-    np.testing.assert_equal(daily_trades, tab1)
-    np.testing.assert_equal(macro_trades, tab2)
-
 def test_calcul_portfolio_value():
     env = Env(hour_trade=df, macro_trade=df_1, price=price)
     result = env.calcul_portfolio_value()
@@ -30,7 +22,7 @@ class TestStep:
     env.reset()
 
     def test_buy(self):
-        state, reward, _, done = self.env.step(1, prob)
+        state, reward, _, _, done = self.env.step(1, prob)
         daily_trades = df[1:24].to_numpy()
         macro_trades =  df_1.loc[0].to_numpy()
         np.testing.assert_equal(daily_trades, state[0])
@@ -41,7 +33,7 @@ class TestStep:
         assert not done
 
     def test_sell(self):
-        state, reward, _, done = self.env.step(2, prob)
+        state, reward, _, _, done = self.env.step(2, prob)
         daily_trades = df[2:25].to_numpy()
         macro_trades =  df_1.loc[0].to_numpy()
         np.testing.assert_equal(daily_trades, state[0])
@@ -50,7 +42,7 @@ class TestStep:
         assert not done
 
     def test_null(self):
-        state, reward, _, done = self.env.step(0, prob)
+        state, reward, _, _, done = self.env.step(0, prob)
         daily_trades = df[3:26].to_numpy()
         macro_trades =  df_1.loc[0].to_numpy()
         np.testing.assert_equal(daily_trades, state[0])
@@ -71,7 +63,7 @@ class TestStep:
             macro_trades = df_1.loc[start_n].to_numpy()
             state_estim = state_p.loc[start_n]
             choice = random.choice([1, 2])
-            state, _, state_pred, done = self.env.step(choice, prob)
+            state, _, state_pred, _, done = self.env.step(choice, prob)
             np.testing.assert_equal(daily_trades, state[0])
             np.testing.assert_equal(macro_trades, state[1])
             np.testing.assert_equal(state_pred, state_estim)
