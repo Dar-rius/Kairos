@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from .compute import return_log, calcul_cost, calcul_sharpe_ratio, profit_and_loss, reward_func
-from .processing import concat_df, convert_to_btc, convert_to_usd
+from .processing import convert_to_btc, convert_to_usd
 import torch
 from torch import Tensor
 
@@ -25,6 +25,11 @@ class Env:
         self.observation_space = [self.hour_trade.shape[1], self.macro_trade.shape[1]]
         self.action_space = 3
         self.device = device
+        self.p_values_return = [0.0, self.init_usd_amount]
+
+    def _update_p_values(self):
+        self.p_values_return[0] = self.p_values_return[1]
+        self.p_values_return[1] = self.calcul_portfolio_value()
 
     def _buy(self):
         cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
@@ -52,8 +57,9 @@ class Env:
         micro_end = micro_start + 23
         self.time = [random_day, micro_start, micro_end]
         self.seq = 0
-        # Reset Portfolio Value 
+        # Reset Portfolio Value
         self.total_amount = {0: self.init_usd_amount, 1: 0.0}
+        self.p_values_return = [self.init_usd_amount, 0.0]
         self.total_pnl = [0.0, 0.0, 0.0, 0.0] # Reset PnL
         self.btc_values = []
         self.historic_data = pd.DataFrame(data={'action':[], 'portfolio': []})
@@ -72,7 +78,7 @@ class Env:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_values[-1])
 
     #Create a group state
-    def new_state(self): 
+    def new_state(self):
         daily_trades = self.hour_trade[self.time[1]:self.time[2]]
         macro_days = self.macro_trade[self.time[0]]
         self.btc_values.append(self.price[self.time[2]])
@@ -91,7 +97,7 @@ class Env:
         return self.new_state()
 
     #The next step of env
-    def step(self, action: int, entropy_b: Tensor) -> tuple:
+    def step(self, action:int, entropy_b:Tensor=None) -> tuple:
         state = self.new_state()
         future_idx = min(self.time[0] + 1, self.size - 1)
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
@@ -99,9 +105,13 @@ class Env:
         if action == 2: self._sell()
         # Buy
         elif action == 1: self._buy()
-        return_ = return_log(self.btc_values[-1], self.btc_values[-2]) if len(self.btc_values) > 1 else 0
+        self._update_p_values()
+        return_ = 0
+        if self.p_values_return[0] > 0.0 and self.p_values_return[1] > 0.0:
+            return_ = return_log(self.p_values_return[1], self.p_values_return[0]) if len(self.btc_values) > 1 else 0
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
-        reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
+        reward = return_ * 100
+        #reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
         return (state, reward, state_pred, truncate, done)

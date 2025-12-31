@@ -17,7 +17,7 @@ GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
 VALUE_COEF = 0.5
-BELIEF_COEF = 0.5
+BELIEF_COEF = 0.05
 
 # Load Data
 hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
@@ -52,6 +52,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         action_masked = env.get_action_mask()
         with torch.no_grad():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+        #print(action_t)
 
         action = action_t.item()
         value = value_t.item()
@@ -78,7 +79,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     with torch.no_grad():
         next_micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         next_macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t)
+        _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
         last_value = next_value.item()
 
     rewards_list = buffer.rewards.flatten().tolist()

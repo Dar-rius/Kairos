@@ -71,7 +71,7 @@ class Agent(nn.Module):
 
     def get_action_and_value(self, micro_x:np.array, macro_x:np.array, action:int=None, mask_action:np.array=None):
         actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
-        if mask_action is not None: actor_logits.masked_fill(~mask_action, -1e8)
+        if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
         if action is None: action = probs.sample()
         log_prob = probs.log_prob(action)

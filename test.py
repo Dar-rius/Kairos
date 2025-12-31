@@ -20,7 +20,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 # --- INITIALISATION ---
 # On met ROLLOUT_STEPS très grand pour éviter les resets intempestifs pendant le test
 # On veut voir la performance sur une longue période continue.
-TEST_STEPS = len(hour_df) - 100
+TEST_STEPS = macro_df.shape[0]
 
 env = Env(hour_df, macro_df, price_series)
 ACTION_DIM = env.action_space
@@ -29,7 +29,7 @@ STATE_DIM = env.observation_space
 # Création de l'agent et chargement des poids
 agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
 print(f"Load model from {MODEL_PATH}...")
-agent.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+agent.load_state_dict(torch.load(MODEL_PATH, weights_only=True, map_location=DEVICE))
 agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
 
 # --- BOUCLE DE TEST ---
@@ -43,7 +43,6 @@ actions_history = []
 pnl_history = []
 
 done = False
-truncate = False
 
 # On utilise tqdm pour voir la progression
 for _ in tqdm(range(TEST_STEPS)):
@@ -66,7 +65,7 @@ for _ in tqdm(range(TEST_STEPS)):
     
     # 2. Step Environment
     # On passe 0 pour belief_entropy car on ne s'entraîne pas
-    next_obs, reward, _, truncate, done = env.step(action, entropy_b=0)
+    next_obs, _, _, _, done = env.step(action, entropy_b=None)
     
     # 3. Enregistrement des datas pour l'analyse
     current_val = env.calcul_portfolio_value()
@@ -76,8 +75,8 @@ for _ in tqdm(range(TEST_STEPS)):
     price_history.append(current_price)
     actions_history.append(action) # 0: Hold, 1: Buy, 2: Sell
     pnl_history.append(env.get_pnl())
-
-    if done or truncate:break
+    
+    if done: break
     micro_obs, macro_obs = next_obs
 
 # --- VISUALISATION DES RÉSULTATS ---
@@ -110,8 +109,6 @@ plt.axhline(y=100000, color='r', linestyle='--', label='Initial Capital') # Assu
 plt.title('Evolution du Portefeuille')
 plt.legend()
 plt.grid(True)
-
 plt.tight_layout()
-plt.savefig('backtest_result.png')
+plt.savefig('runs/test/backtest_result.png')
 print("Graphique sauvegardé sous 'backtest_result.png'")
-plt.show()
