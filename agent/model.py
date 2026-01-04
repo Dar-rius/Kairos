@@ -80,11 +80,22 @@ class Agent(nn.Module):
         value = self.critic(context)
         return action_logits, value, belief_logits
 
-    def get_action_and_value(self, micro_x:np.array, macro_x:np.array, action:int=None, mask_action:np.array=None):
+    def get_action_and_value(self, micro_x:np.array, macro_x:np.array, action:int=None, mask_action:np.array=None, deterministic:bool=False, confidence_threshold:float=0.0):
         actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
         if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
-        if action is None: action = probs.sample()
+        if action is None: 
+            if deterministic:
+                action = torch.argmax(actor_logits, dim=1)
+            else:
+                action = probs.sample()
+
+            if confidence_threshold > 0.0:
+                probs_tensor = F.softmax(actor_logits, dim=1)
+                action_probs = probs_tensor.gather(1, action.view(-1, 1)).squeeze()
+                low_confidence_mask = action_probs < confidence_threshold
+                action[low_confidence_mask] = 0
+
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
         belief_probs = F.softmax(belief_logits, dim=1)

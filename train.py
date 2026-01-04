@@ -33,7 +33,7 @@ env = Env(hour_df, macro_df, price_series, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
-belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt"))
+belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
 agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
@@ -59,7 +59,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         action = action_t.item()
         value = value_t.item()
         log_prob = log_prob_t.item()
-        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
+        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy.item())
         buffer.insert(
             micro_state=micro_t,
             macro_state=macro_t,
@@ -90,7 +90,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
     buffer.insert_returns(returns)
     #Compute Belief PPO
-    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, global_step)
+    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step)
     # Clean buffer
     buffer.clear()
     writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)

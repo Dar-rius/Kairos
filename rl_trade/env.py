@@ -97,7 +97,7 @@ class Env:
         return self.new_state()
 
     #The next step of env
-    def step(self, action:int, entropy_b:Tensor=None) -> tuple:
+    def step(self, action:int, entropy_b:float=None) -> tuple:
         state = self.new_state()
         future_idx = min(self.time[0] + 1, self.size - 1)
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
@@ -112,6 +112,6 @@ class Env:
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
-        reward = np.clip(return_ * 100, -10, 10)
-        #reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
+        #reward = np.clip(return_ * 100, -10, 10)
+        reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
         return (state, reward, state_pred, truncate, done)
