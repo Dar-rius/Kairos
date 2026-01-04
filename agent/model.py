@@ -4,19 +4,36 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 import numpy as np
 
-class Agent(nn.Module):
-    def __init__(self, micro_dim:int, macro_dim:int, action_dim:int, num_regimes:int=3):
-        super(Agent, self).__init__()
-       # --- SYSTEM 2 (Le Stratège - Macro) ---
+class MacroHead(nn.Module):
+    def __init__(self, macro_dim:int, num_regimes:int=3):
+        super(MacroHead, self).__init__()
         self.macro_net = nn.Sequential(
-            nn.Linear(macro_dim, 64),
+            nn.Linear(macro_dim, 128),
             nn.ReLU(),
-            nn.Linear(64, 32) # Sort un vecteur de contexte latent
+            nn.Linear(128, 32),
+            nn.ReLU(),
         )
-        # Tête de prédiction explicite
         self.belief_head = nn.Linear(32, num_regimes)
+        self._init_weights()
 
-        # --- SYSTEM 1 (L'Exécutant - Micro) ---
+    def _init_weights(self):
+        for layer in self.macro_net:
+            if isinstance(layer, nn.Linear):
+                nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                nn.init.constant_(layer.bias, 0.0)
+
+        nn.init.orthogonal_(self.belief_head.weight, gain=1.0)
+        nn.init.constant_(self.belief_head.bias, 0.0)
+
+    def forward(self, macro_x:np.array):
+        x = self.macro_net(macro_x)
+        belief_logits = self.belief_head(x)
+        return x, belief_logits
+
+class Agent(nn.Module):
+    def __init__(self, micro_dim:int, action_dim:int, num_regimes:int=3, pretrained_model=None):
+        super(Agent, self).__init__()
+        self.belief_head = pretrained_model
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
         
         # --- FUSION HIÉRARCHIQUE ---
@@ -40,15 +57,10 @@ class Agent(nn.Module):
             elif 'bias' in name:
                 nn.init.constant_(param, 0.0)
 
-        for module in [self.macro_net, self.actor_layer]:
-            for layer in module:
-                if isinstance(layer, nn.Linear):
-                    nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
-                    nn.init.constant_(layer.bias, 0.0)
-
-        for layer in [self.critic, self.belief_head]:
-            nn.init.orthogonal_(layer.weight, gain=1.0)
-            nn.init.constant_(layer.bias, 0.0)
+        for layer in self.actor_layer:
+            if isinstance(layer, nn.Linear):
+                nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                nn.init.constant_(layer.bias, 0.0)
 
         actor_out = self.actor_layer[-1]
         nn.init.orthogonal_(actor_out.weight, gain=0.01)
@@ -56,8 +68,7 @@ class Agent(nn.Module):
 
     def forward(self, micro_x:np.array, macro_x:np.array):
         # System 2
-        macro_feat = self.macro_net(macro_x)
-        belief_logits = self.belief_head(macro_feat)
+        macro_feat, belief_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()

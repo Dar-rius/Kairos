@@ -26,7 +26,8 @@ class Writer:
 class PPOTrainer:
     def __init__(self, model:Agent, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, ent_coef:float=0.01):
         self.model = model
-        self.optimizer = optim.Adam(model.parameters(), lr=lr)
+        self.lr = lr
+        self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         # Hyperparams PPO
         self.gamma = gamma
         self.gae_lambda = gae_lambda
@@ -50,8 +51,15 @@ class PPOTrainer:
         returns = np.array(returns).reshape(-1,1)
         return returns
 
+    def lr_decay(self, lr:float, total_steps:int, step:int):
+        frac = 1.0 - (step / total_steps)
+        current_lr = lr * frac
+        for param_group in self.optimizer.param_groups:
+            param_group["lr"] = current_lr
+
     # Compute Belief PPO and Update network weights
-    def update(self, memory:Buffer, batch_size:int=64, epochs:int=10):
+    def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
+        self.lr_decay(self.lr, total_steps, step)
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
         micro_states, macro_states, actions, old_log_probs, returns, _, _, _, target_regimes = memory.get_all()
         # Normalize the advantages

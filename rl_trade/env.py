@@ -112,6 +112,6 @@ class Env:
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
-        reward = return_ * 100
+        reward = np.clip(return_ * 100, -10, 10)
         #reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
         return (state, reward, state_pred, truncate, done)

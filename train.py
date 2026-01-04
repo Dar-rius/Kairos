@@ -1,7 +1,7 @@
 from rl_trade.env import Env
 from agent.ppo import PPOTrainer, Writer
 from agent.buffer import Buffer
-from agent.model import Agent
+from agent.model import Agent, MacroHead
 from tqdm import tqdm # Barre de progression
 import torch
 import numpy as np
@@ -17,7 +17,7 @@ GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
 VALUE_COEF = 0.5
-BELIEF_COEF = 0.05
+BELIEF_COEF = 0.06
 
 # Load Data
 hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
@@ -25,14 +25,16 @@ macro_df = pd.read_csv("./data_off/train_test/metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv("./data_off/train_test/price_close_train.csv")["Close"]
 state_series = pd.read_csv("./data_off/train_test/state_train.csv")["state"]
 
-TOTAL_TIMESTAMP = 1000000
-BATCH_SIZE = 64
+TOTAL_TIMESTAMP = 2000000
+BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
-agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
+belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
+belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt"))
+agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
@@ -45,7 +47,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     cumulative_reward: float = 0.0
     cumulative_pnl: float = 0.0
     # Collecte phase
-    for step in tqdm(range(ROLLOUT_STEPS)):
+    for step in range(ROLLOUT_STEPS):
         global_step += 1
         micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
@@ -88,11 +90,12 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
     buffer.insert_returns(returns)
     #Compute Belief PPO
-    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer)
+    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, global_step)
     # Clean buffer
     buffer.clear()
     writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
 
 #Save model
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')
+torch.save(belief_model.state_dict(), './agent/save/belief_head_1.pt')
 writer.close()

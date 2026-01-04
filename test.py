@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from rl_trade.env import Env
-from agent.model import Agent
+from agent.model import Agent, MacroHead
 from tqdm import tqdm
 
 # --- CONFIGURATION ---
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = './agent/save/agent_saved.pt'  # Chemin vers ton modèle entraîné
+AGENT_PATH = './agent/save/agent_saved.pt'  # Chemin vers ton modèle entraîné
+BELIEF_PATH = './agent/save/belief_head_1.pt'  # Chemin vers ton modèle entraîné
 DATA_PATH = './data_off/train_test/'
 
 # On veut tester sur tout le dataset ou une partie spécifique (ex: test set)
@@ -27,9 +28,12 @@ ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 
 # Création de l'agent et chargement des poids
-agent = Agent(STATE_DIM[0], STATE_DIM[1], ACTION_DIM).to(DEVICE)
-print(f"Load model from {MODEL_PATH}...")
-agent.load_state_dict(torch.load(MODEL_PATH, weights_only=True, map_location=DEVICE))
+macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
+print(f"Load model from {AGENT_PATH}...")
+print(f"Load model from {BELIEF_PATH}...")
+macro_head.load_state_dict(torch.load(BELIEF_PATH, weights_only=True, map_location=DEVICE))
+agent = Agent(STATE_DIM[0], ACTION_DIM, pretrained_model=macro_head).to(DEVICE)
+agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
 agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
 
 # --- BOUCLE DE TEST ---
@@ -111,4 +115,3 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.savefig('runs/test/backtest_result.png')
-print("Graphique sauvegardé sous 'backtest_result.png'")
