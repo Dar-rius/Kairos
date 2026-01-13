@@ -9,15 +9,15 @@ from torch import Tensor
 class Env:
     def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.init_usd_amount = amount_usd
-        # Total Profit [buy_price, pnl_brut, fees, pnl_final]
+        # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
         self.total_pnl: list = [0.0, 0.0, 0.0, 0.0]
         self.btc_values: list[float] = []
         self.hour_trade = hour_trade.to_numpy()
         self.macro_trade = macro_trade.to_numpy()
         self.state_pred = state_pred.to_numpy() if state_pred is not None else None
         self.price = price.to_numpy()
+        # Time for trades [Day, Start Hour, Last Hour]
         self.time = [0, 0, 23]
-        #self.metric = pd.DataFrame(data={'date':[], "sharpe ratio": [], "tp": []})
         self.total_amount: dict = {0: self.init_usd_amount, 1: 0.0}
         self.cost_rate = cost_rate
         self.size = self.macro_trade.shape[0]
@@ -48,21 +48,22 @@ class Env:
         self.total_pnl[3] = profit_and_loss(self.total_pnl)
         self.total_amount[1] = 0
 
-    def _all_reset(self):
-        min_steps_left = 500
-        max_macro_idx = self.size - (min_steps_left // 24) - 1
-        random_day = np.random.randint(0, max_macro_idx) if max_macro_idx > 0 else 0
-        # Synchronised the Micro and Macro index
-        micro_start = random_day * 24
-        micro_end = micro_start + 23
-        self.time = [random_day, micro_start, micro_end]
+    def _all_reset(self, train:bool=True):
+        if train:
+            min_steps_left = 500
+            max_macro_idx = self.size - (min_steps_left // 24) - 1
+            random_day = np.random.randint(0, max_macro_idx) if max_macro_idx > 0 else 0
+            # Synchronised the Micro and Macro index
+            micro_start = random_day * 24
+            micro_end = micro_start + 23
+            self.time = [random_day, micro_start, micro_end]
+        else: self.time = [0, 0, 23]
         self.seq = 0
         # Reset Portfolio Value
         self.total_amount = {0: self.init_usd_amount, 1: 0.0}
         self.p_values_return = [self.init_usd_amount, 0.0]
         self.total_pnl = [0.0, 0.0, 0.0, 0.0] # Reset PnL
         self.btc_values = []
-        self.historic_data = pd.DataFrame(data={'action':[], 'portfolio': []})
 
     def _next(self):
         self.time[1] += 1
@@ -77,7 +78,7 @@ class Env:
     def calcul_portfolio_value(self) -> float:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_values[-1])
 
-    #Create a group state
+    # Create a group state
     def new_state(self):
         daily_trades = self.hour_trade[self.time[1]:self.time[2]]
         macro_days = self.macro_trade[self.time[0]]
@@ -91,12 +92,12 @@ class Env:
         else: mask[1] = False
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
-    #Reset the env to 0
-    def reset(self):
-        self._all_reset()
+    # Reset the env to 0
+    def reset(self, train:bool=True):
+        self._all_reset(train)
         return self.new_state()
 
-    #The next step of env
+    # The next step of env
     def step(self, action:int, entropy_b:float=None) -> tuple:
         state = self.new_state()
         future_idx = min(self.time[0] + 1, self.size - 1)
@@ -112,6 +113,5 @@ class Env:
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
-        #reward = np.clip(return_ * 100, -10, 10)
-        reward: float = reward_func(return_, self.cost_rate, action, entropy_b)
+        reward = reward_func(return_, self.cost_rate, action, entropy_b)
         return (state, reward, state_pred, truncate, done)

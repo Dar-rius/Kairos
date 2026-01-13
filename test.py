@@ -5,29 +5,25 @@ import matplotlib.pyplot as plt
 from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
+from rl_trade.compute import calcul_sharpe_ratio
 
-# --- CONFIGURATION ---
+# Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-AGENT_PATH = './agent/save/agent_saved.pt'  # Chemin vers ton modèle entraîné
-BELIEF_PATH = './agent/save/belief_head_1.pt'  # Chemin vers ton modèle entraîné
+AGENT_PATH = './agent/save/agent_saved.pt'
+BELIEF_PATH = './agent/save/belief_head_1.pt'
 DATA_PATH = './data_off/train_test/'
-
-# On veut tester sur tout le dataset ou une partie spécifique (ex: test set)
-# Ici, on recharge les mêmes données, mais l'env sera configuré pour tout parcourir.
+# DataFrame 
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 
-# --- INITIALISATION ---
-# On met ROLLOUT_STEPS très grand pour éviter les resets intempestifs pendant le test
-# On veut voir la performance sur une longue période continue.
-TEST_STEPS = macro_df.shape[0]
-
+# Initialization
 env = Env(hour_df, macro_df, price_series)
+TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 
-# Création de l'agent et chargement des poids
+# Load weights
 macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
 print(f"Load model from {AGENT_PATH}...")
 print(f"Load model from {BELIEF_PATH}...")
@@ -36,81 +32,59 @@ agent = Agent(STATE_DIM[0], ACTION_DIM, pretrained_model=macro_head).to(DEVICE)
 agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
 agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
 
-# --- BOUCLE DE TEST ---
 print("Run the Backtest...")
 micro_obs, macro_obs = env.reset()
 
-# Variables pour le tracking
+# Tracking
 portfolio_history = []
 price_history = []
 actions_history = []
 pnl_history = []
-
 done = False
-
-# On utilise tqdm pour voir la progression
 for _ in tqdm(range(TEST_STEPS)):
-    
-    # 1. Préparation des données (Comme dans train, mais sans gradient)
     micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     action_mask = env.get_action_mask()
-    
     with torch.no_grad():
-        # On demande l'action à l'agent
-        # Note: En test, on peut vouloir être déterministe (argmax) ou garder le sampling.
-        # Avec PPO, le sampling reste souvent utilisé, mais pour un backtest strict,
-        # on préfère souvent prendre l'action la plus probable.
-        # Ici on garde ton get_action_and_value qui sample, mais comme l'entropie a baissé,
-        # il devrait être confiant.
         action_t, _, _, _, _, _ = agent.get_action_and_value(micro_t, macro_t, mask_action=action_mask)
     
     action = action_t.item()
-    
-    # 2. Step Environment
-    # On passe 0 pour belief_entropy car on ne s'entraîne pas
     next_obs, _, _, _, done = env.step(action, entropy_b=None)
-    
-    # 3. Enregistrement des datas pour l'analyse
     current_val = env.calcul_portfolio_value()
     current_price = env.btc_values[-1] if len(env.btc_values) > 0 else 0
-    
     portfolio_history.append(current_val)
     price_history.append(current_price)
-    actions_history.append(action) # 0: Hold, 1: Buy, 2: Sell
+    actions_history.append(action)
     pnl_history.append(env.get_pnl())
-    
     if done: break
     micro_obs, macro_obs = next_obs
+results_df = pd.DataFrame({
+    'portfolio_value': portfolio_history,
+    'btc_value': price_history,
+})
+# Compute sharpe ratio
+sharpe = calcul_sharpe_ratio(portfolio_history, price_history)
+# Display last history value
+print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpe}")
 
-# --- VISUALISATION DES RÉSULTATS ---
-print(f"Portfolio Final: {portfolio_history[-1]:.2f} $")
-print(f"PnL Final (Net): {pnl_history[-1]:.2f} $")
-
-# Création du graphique
+# Plot all historic Bloc
 plt.figure(figsize=(15, 10))
-
-# Sous-graphique 1 : Prix BTC et Actions
+# Sub-graph 1: Price BTC and Actions
 plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
-
-# On récupère les indices où on a acheté (1) et vendu (2)
 buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
 sell_idx = [i for i, x in enumerate(actions_history) if x == 2]
-
-# Affichage des points d'achat/vente
+# Display the actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
 plt.scatter(sell_idx, [price_history[i] for i in sell_idx], marker='v', color='red', label='Sell', s=50)
-
-plt.title('Stratégie de Trading (Prix BTC)')
+plt.title('Trading Strategy (Price BTC)')
 plt.legend()
 plt.grid(True)
-
-# Sous-graphique 2 : Valeur du Portefeuille
+# Sub-graph 2: Porfolio Value
 plt.subplot(2, 1, 2)
 plt.plot(portfolio_history, label='Portfolio Value ($)', color='blue')
 plt.axhline(y=100000, color='r', linestyle='--', label='Initial Capital') # Assumant 100k départ
-plt.title('Evolution du Portefeuille')
+plt.title('Porfolio Evolution')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()

@@ -11,7 +11,6 @@ class Buffer:
     4 -> Reward
     5 -> Value
     6 -> Target Regime
-
     Other: Return (Advantage)
     """
     def __init__(self, step:int, micro_size:int, macro_size:int, device:str):

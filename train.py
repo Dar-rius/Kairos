@@ -17,7 +17,7 @@ GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
 VALUE_COEF = 0.5
-BELIEF_COEF = 0.06
+BELIEF_COEF = 0.3
 
 # Load Data
 hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
