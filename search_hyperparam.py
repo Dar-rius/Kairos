@@ -75,7 +75,8 @@ def objective(trial):
                 micro_obs, macro_obs = env.reset()
             else:
                 micro_obs, macro_obs = next_obs
-        # Optimisation phase
+
+        # Optimization phase
         with torch.no_grad():
             next_micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
             next_macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
