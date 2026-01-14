@@ -4,9 +4,10 @@ from .compute import return_log, calcul_cost, calcul_sharpe_ratio, profit_and_lo
 from .processing import convert_to_btc, convert_to_usd
 import torch
 from torch import Tensor
+import gymnasium as gym
 
 # ******* ENV **********
-class Env:
+class Env(gym.Env):
     def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.init_usd_amount = amount_usd
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]

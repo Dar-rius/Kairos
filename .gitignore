@@ -5,3 +5,6 @@
 /agent/__pycache__
 /agent/save
 /runs/
+*.sqlite3
+db.sqlite3
+db.sqlite3
