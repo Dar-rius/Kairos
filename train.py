@@ -90,7 +90,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
     buffer.insert_returns(returns)
     #Compute Belief PPO
-    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step)
+    loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
     # Clean buffer
     buffer.clear()
     writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl)
