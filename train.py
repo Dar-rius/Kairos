@@ -40,7 +40,7 @@ if hasattr(agent, 'actor'):
     agent.belief_head = torch.jit.script(agent.belief_head)
     agent.actor_layer = torch.jit.script(agent.actor_layer)
     agent.critic = torch.jit.script(agent.critic)
-trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
+trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF, device=DEVICE)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
 
@@ -78,8 +78,8 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         )
         cumulative_reward += reward
         cumulative_pnl += env.get_pnl()
-        portfolio_value.append(env.calcul_portfolio_value())
-        btc_value.append(env.btc_value)
+        portfolio_value.append(env.calcul_portfolio_value().item())
+        btc_value.append(env.btc_value.item())
         if done or truncate:
             micro_obs, macro_obs = env.reset()
         else:

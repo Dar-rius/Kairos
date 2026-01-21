@@ -1,5 +1,6 @@
 import pandas as pd
 from torch import Tensor
+import torch
 
 def to_df(new_df: dict) -> pd.DataFrame:
     df = pd.DataFrame(new_df)
@@ -16,9 +17,9 @@ def convert_and_save_df(data: dict, filename: str):
 #Convert the Tensor to List
 def convert_tensor_to_list(tensor: Tensor): return tensor.tolist()
 
-def convert_to_btc(amount_usd: float, btc_value: float): return amount_usd / btc_value
+def convert_to_btc(amount_usd: Tensor, btc_value: Tensor, device:str): return amount_usd / btc_value
 
-def convert_to_usd(amount_btc: float, btc_value: float): return amount_btc * btc_value
+def convert_to_usd(amount_btc: Tensor, btc_value: Tensor, device:str): return amount_btc * btc_value
 
 #Convert df to list
 def df_to_list(dataset: pd.DataFrame) -> tuple:

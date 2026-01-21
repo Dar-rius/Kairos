@@ -7,12 +7,12 @@ from torch import Tensor
 
 BETA = .25
 
-def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low: float = .3, beta: float =0.25) -> float:
+def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low: float = .3) -> float:
     if entropy_b is None: return 0.0
     action = torch.where(action == 2, -1.0, action.float())
     # Compute the macro strategy for detect the state of market
     second_macro = torch.clamp(entropy_b - entropy_low, min=0.0)
-    macro_strat = torch.abs(action) * beta *  second_macro
+    macro_strat = torch.abs(action) * BETA *  second_macro
     return torch.clamp((return_ * 100) - macro_strat, -10.0, 10.0)
 
 #Compute the sharpe ration
@@ -51,7 +51,7 @@ def calcul_trade_metrics(returns: list[float]) -> float:
     expectancy = (win_rate * avg_win) - (loss_rate * avg_loss)
     return expectancy
 
-def calcul_cost(amount: float, cost_rate: float): return amount * cost_rate
+def calcul_cost(amount: Tensor, cost_rate: Tensor, device:str): return amount * cost_rate
 
 def compute_entropy(prob: list[float]): return entropy(prob, base=2)
 

@@ -17,8 +17,6 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.95, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.95, 0.99)
-    entropy_low = trial.suggest_float("entropy_low", 0.01, 0.5)
-    beta = trial.suggest_float("beta", 0.01, 0.5)
     clip_eps = 0.2
     ent_coef = trial.suggest_float("ent_coef", 0.001, 0.1, log=True)
     value_coef = trial.suggest_float("value_coef", 0.005, 0.5, log=True)
@@ -40,7 +38,11 @@ def objective(trial):
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
     belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
     agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
-    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef)
+    if hasattr(agent, 'actor'):
+        agent.belief_head = torch.jit.script(agent.belief_head)
+        agent.actor_layer = torch.jit.script(agent.actor_layer)
+        agent.critic = torch.jit.script(agent.critic)
+    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, device=DEVICE)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
@@ -54,45 +56,45 @@ def objective(trial):
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
             global_step += 1
-            micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+            micro_t = micro_obs.unsqueeze(0)
+            macro_t = macro_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
-            with torch.no_grad():
+            with torch.inference_mode():
                 action_t, log_prob_t, _, value_t, _, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            action = action_t.item()
-            value = value_t.item()
-            next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy.item(), entropy_low, beta)
+            action = action_t
+            value = value_t
+            next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
-                action=action_t.item(),
-                old_log_prob=log_prob_t.item(),
+                action=action,
+                old_log_prob=log_prob_t,
                 reward=reward,
                 value=value,
                 dones = 1.0 if done else 0.0,
                 target_regime=target_regime
             )
             cumulative_reward += reward
-            btc_value.append(env.btc_values[-1])
-            portfolio_value.append(env.calcul_portfolio_value())
+            btc_value.append(env.btc_value.item())
+            portfolio_value.append(env.calcul_portfolio_value().item())
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
             else:
                 micro_obs, macro_obs = next_obs
 
         # Optimization phase
-        with torch.no_grad():
-            next_micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            next_macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        with torch.inference_mode():
+            next_micro_t = micro_obs.unsqueeze(0)
+            next_macro_t = macro_obs.unsqueeze(0)
             _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
-            last_value = next_value.item()
+            last_value = torch.tensor([next_value.item()], device=DEVICE)
 
-        rewards_list = buffer.rewards.flatten().tolist()
-        values_list = buffer.values.flatten().tolist()
-        dones_list = buffer.dones.flatten().tolist()
-        returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
-        buffer.insert_returns(returns)
+        rewards_list = buffer.rewards
+        values_list = buffer.values
+        dones_list = buffer.dones
+        returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
+        buffer.insert_returns(returns, adv)
         #Compute Belief PPO
         trainer.update(buffer, TOTAL_TIMESTAMP, step, batch_size)
         # Clean buffer
@@ -103,7 +105,6 @@ def objective(trial):
         trial.report(sharpe, epoch)
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
-
     return sharpe
 
 study = optuna.create_study(direction = 'maximize',
