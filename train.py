@@ -57,7 +57,6 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         action_masked = env.get_action_mask()
         with torch.no_grad():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
-        #print(action_t)
 
         action = action_t.item()
         value = value_t.item()
@@ -86,16 +85,16 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         next_micro_t = micro_obs.unsqueeze(0)
         next_macro_t = macro_obs.unsqueeze(0)
         _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
-        last_value = next_value.item()
+        last_value = torch.tensor([next_value.item()], device=DEVICE)
 
     sharpe =  calcul_sharpe_ratio(portfolio_value, btc_value)
     expectancy =  calcul_trade_metrics(portfolio_value)
     mdd = max_dd(portfolio_value)
-    rewards_list = buffer.rewards.flatten().tolist()
-    values_list = buffer.values.flatten().tolist()
-    dones_list = buffer.dones.flatten().tolist()
-    returns = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
-    buffer.insert_returns(returns)
+    rewards_list = buffer.rewards
+    values_list = buffer.values
+    dones_list = buffer.dones
+    returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
+    buffer.insert_returns(returns, adv)
     #Compute Belief PPO
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
     # Clean buffer

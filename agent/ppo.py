@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+from torch import Tensor
 from .buffer import Buffer
 from .model import Agent
 from torch.utils.tensorboard import SummaryWriter
@@ -42,17 +43,18 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
 
-    def compute_gae(self, rewards:list, values:list, last_value:float, dones:list) -> np.array:
-        values = values + [last_value]
-        returns: list(float) = []
+    def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor]:
         gae: float = 0.0
-        for step in reversed(range(len(rewards))):
-            mask = 1.0 - dones[step]
-            delta = rewards[step] + self.gamma * values[step + 1] * mask - values[step]
-            gae = delta + self.gamma * self.gae_lambda * mask * gae
-            returns.insert(0,  gae + values[step])
-        returns = np.array(returns).reshape(-1,1)
-        return returns
+        mask = 1.0 - dones
+        next_values = torch.cat((values[1:], last_value), 0)
+        total_size = rewards.size(0)
+        advantages = torch.zeros_like(rewards)
+        delta = rewards + self.gamma * next_values * mask - values
+        for step in reversed(range(total_size)):
+            gae = delta[step] + self.gamma * self.gae_lambda * mask[step] * gae
+            advantages[step] =  gae
+        returns = advantages + values
+        return (returns, advantages)
 
     def lr_decay(self, lr:float, total_steps:int, step:int):
         frac = 1.0 - (step / total_steps)
@@ -64,9 +66,9 @@ class PPOTrainer:
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
         self.lr_decay(self.lr, total_steps, step)
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, _, _, _, target_regimes = memory.get_all()
+        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _, target_regimes = memory.get_all()
         # Normalize the advantages
-        advantages = (returns - returns.mean()) / (returns.std() + 1e-8)
+        advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = len(actions)
         indices = np.arange(0, dataset_size, batch_size)
         for _ in range(epochs):
@@ -83,7 +85,7 @@ class PPOTrainer:
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages[idx]
                 policy_loss = -torch.min(surr1, surr2).mean()
                 # Loss Value (Critic) - MSE
-                value_loss = self.mse_loss(new_values, returns[idx])
+                value_loss = self.mse_loss(new_values.view(-1), returns[idx].view(-1))
                 # Loss Belief (Auxiliary) - Cross Entropy
                 belief_loss = self.ce_loss(belief_logits, target_regimes[idx].view(-1).long())
                 # Total Loss
