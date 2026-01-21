@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from torch import Tensor
 import numpy as np
 
 class MacroHead(nn.Module):
@@ -25,7 +26,7 @@ class MacroHead(nn.Module):
         nn.init.orthogonal_(self.belief_head.weight, gain=1.0)
         nn.init.constant_(self.belief_head.bias, 0.0)
 
-    def forward(self, macro_x:np.array):
+    def forward(self, macro_x:Tensor):
         x = self.macro_net(macro_x)
         belief_logits = self.belief_head(x)
         return x, belief_logits
@@ -66,7 +67,7 @@ class Agent(nn.Module):
         nn.init.orthogonal_(actor_out.weight, gain=0.01)
         nn.init.constant_(actor_out.bias, 0.0)
 
-    def forward(self, micro_x:np.array, macro_x:np.array):
+    def forward(self, micro_x:Tensor, macro_x:Tensor):
         # System 2
         macro_feat, belief_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
@@ -80,7 +81,7 @@ class Agent(nn.Module):
         value = self.critic(context)
         return action_logits, value, belief_logits
 
-    def get_action_and_value(self, micro_x:np.array, macro_x:np.array, action:int=None, mask_action:np.array=None):
+    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int=None, mask_action:Tensor=None):
         actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
         if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)

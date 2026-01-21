@@ -36,6 +36,10 @@ STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
 belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
 agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
+if hasattr(agent, 'actor'):
+    agent.belief_head = torch.jit.script(agent.belief_head)
+    agent.actor_layer = torch.jit.script(agent.actor_layer)
+    agent.critic = torch.jit.script(agent.critic)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
@@ -55,7 +59,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         micro_t = micro_obs.unsqueeze(0)
         macro_t = macro_obs.unsqueeze(0)
         action_masked = env.get_action_mask()
-        with torch.no_grad():
+        with torch.inference_mode():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
         action = action_t
@@ -81,7 +85,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         else:
             micro_obs, macro_obs = next_obs
     # Optimisation phase
-    with torch.no_grad():
+    with torch.inference_mode():
         next_micro_t = micro_obs.unsqueeze(0)
         next_macro_t = macro_obs.unsqueeze(0)
         _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
