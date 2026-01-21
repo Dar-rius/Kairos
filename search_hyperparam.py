@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import pandas as pd
 import optuna
+from rl_trade.compute import calcul_sharpe_ratio
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
@@ -16,6 +17,8 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.95, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.95, 0.99)
+    entropy_low = trial.suggest_float("entropy_low", 0.01, 0.5)
+    beta = trial.suggest_float("beta", 0.01, 0.5)
     clip_eps = 0.2
     ent_coef = trial.suggest_float("ent_coef", 0.001, 0.1, log=True)
     value_coef = trial.suggest_float("value_coef", 0.005, 0.5, log=True)
@@ -40,13 +43,14 @@ def objective(trial):
     trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
-# Run env
+    # Run env
     micro_obs, macro_obs = env.reset()
     global_step = 0
-# Training Loop
-    for epoch in range(1, 10 + 1):
+    # Training Loop
+    for epoch in range(1, 100 + 1):
         cumulative_reward: float = 0.0
-        cumulative_pnl: float = 0.0
+        btc_value: list[float] = []
+        portfolio_value: list[float] = []
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
             global_step += 1
@@ -58,7 +62,7 @@ def objective(trial):
 
             action = action_t.item()
             value = value_t.item()
-            next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy.item())
+            next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy.item(), entropy_low, beta)
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
@@ -70,7 +74,8 @@ def objective(trial):
                 target_regime=target_regime
             )
             cumulative_reward += reward
-            cumulative_pnl += env.get_pnl()
+            btc_value.append(env.btc_values[-1])
+            portfolio_value.append(env.calcul_portfolio_value())
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
             else:
@@ -93,17 +98,16 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
+        sharpe =  calcul_sharpe_ratio(portfolio_value, btc_value)
         # For optuna
-        trial.report(cumulative_reward, epoch)
+        trial.report(sharpe, epoch)
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
-    return cumulative_reward
-
+    return sharpe
 
 study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
-                            study_name="rl_optimizer",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
 study.optimize(objective, n_trials=100)

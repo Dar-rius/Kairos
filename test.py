@@ -51,7 +51,7 @@ for _ in tqdm(range(TEST_STEPS)):
     action = action_t.item()
     next_obs, _, _, _, done = env.step(action, entropy_b=None)
     current_val = env.calcul_portfolio_value()
-    current_price = env.btc_values[-1] if len(env.btc_values) > 0 else 0
+    current_price = env.btc_value
     portfolio_history.append(current_val)
     price_history.append(current_price)
     actions_history.append(action)
