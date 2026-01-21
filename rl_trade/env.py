@@ -99,7 +99,7 @@ class Env(gym.Env):
         return self.new_state()
 
     # The next step of env
-    def step(self, action:int, entropy_b:float=None, beta: float=0.25, entropy_low:float=.3) -> tuple:
+    def step(self, action:Tensor, entropy_b:Tensor=None, beta: float=0.25, entropy_low:float=.3) -> tuple[Tensor]:
         state = self.new_state()
         future_idx = min(self.time[0] + 1, self.size - 1)
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
@@ -108,9 +108,9 @@ class Env(gym.Env):
         # Buy
         elif action == 1: self._buy()
         self._update_p_values()
-        return_ = return_log(self.p_values_return[1], self.p_values_return[0])
+        return_ = return_log(self.p_values_return, self.device)
         done = True if self.time[2] == self.hour_trade.shape[0] else False
         truncate = True if self.calcul_portfolio_value() == 0 else False
         #Compute the reward
-        reward = reward_func(return_, self.cost_rate, action, entropy_b, entropy_low, beta)
+        reward = reward_func(return_, action, entropy_b, entropy_low, beta)
         return (state, reward, state_pred, truncate, done)

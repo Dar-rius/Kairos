@@ -58,15 +58,15 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         with torch.no_grad():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-        action = action_t.item()
-        value = value_t.item()
-        log_prob = log_prob_t.item()
-        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy.item())
+        action = action_t
+        value = value_t
+        log_prob = log_prob_t
+        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
         buffer.insert(
             micro_state=micro_t,
             macro_state=macro_t,
-            action=action_t.item(),
-            old_log_prob=log_prob_t.item(),
+            action=action_t,
+            old_log_prob=log_prob_t,
             reward=reward,
             value=value,
             dones = 1.0 if done else 0.0,

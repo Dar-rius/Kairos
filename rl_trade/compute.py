@@ -7,13 +7,13 @@ from torch import Tensor
 
 BETA = .25
 
-def reward_func(return_: float, cost_rate: float, action: int, entropy_b: Tensor, entropy_low: float = .3, beta: float =0.25) -> float:
+def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low: float = .3, beta: float =0.25) -> float:
     if entropy_b is None: return 0.0
-    if action == 2: action = -1
+    action = torch.where(action == 2, -1.0, action.float())
     # Compute the macro strategy for detect the state of market
-    second_macro = max(0, entropy_b - entropy_low)
-    macro_strat = abs(action) * beta *  second_macro
-    return np.clip((return_ * 100) - macro_strat, -10.0, 10.0)
+    second_macro = torch.clamp(entropy_b - entropy_low, min=0.0)
+    macro_strat = torch.abs(action) * beta *  second_macro
+    return torch.clamp((return_ * 100) - macro_strat, -10.0, 10.0)
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(data_p: list[float], data_btc: list[float]) -> float:
@@ -63,7 +63,7 @@ def return_log_vec(data: list) -> Tensor:
     return p_return
 
 #Compute the return log
-def return_log(current: float, previous: float) -> float: 
-    if current > 0.0 and previous > 0.0: 
-        return math.log(current / previous)
-    return 0.0
+def return_log(data: Tensor, device:str) -> Tensor: 
+    if data[1] > 1e-8 and data[0] > 1e-8: 
+        return torch.log(data[1] / data[0])
+    return torch.tensor(0.0, device=device)
