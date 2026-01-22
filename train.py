@@ -12,13 +12,13 @@ DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
-LR = 4.4135003154399014e-05
-GAMMA = 0.9637724785369991
-GAE_LAMBDA = 0.9705521951905898
+LR = 3e-5
+GAMMA = 0.97
+GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.0015161404860857912
-VALUE_COEF = 0.16838631009179422
-BELIEF_COEF = 0.013925049228912462
+ENT_COEF = 0.01
+VALUE_COEF = 0.3
+BELIEF_COEF = 0.2
 
 # Load Data
 hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
@@ -27,7 +27,7 @@ price_series = pd.read_csv("./data_off/train_test/price_close_train.csv")["Close
 state_series = pd.read_csv("./data_off/train_test/state_train.csv")["state"]
 
 TOTAL_TIMESTAMP = 3000000
-BATCH_SIZE = 256
+BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series)
