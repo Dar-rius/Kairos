@@ -12,7 +12,7 @@ class Writer:
     def __init__(self, path:str):
         self.writer = SummaryWriter(log_dir=path)
 
-    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float, pnl:float, sharpe:float, mdd:float, expectancy:float):
+    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float, pnl:float, sharpe:float, mdd:float):
         self.writer.add_scalar("Policy Loss", policy_loss, step)
         self.writer.add_scalar("Critic Loss", critic_loss, step)
         self.writer.add_scalar("Belief Loss", belief_loss, step)
@@ -22,7 +22,6 @@ class Writer:
         self.writer.add_scalar("PNL", pnl, step)
         self.writer.add_scalar("Sharpe ratio", sharpe, step)
         self.writer.add_scalar("Max Draw Down", mdd, step)
-        self.writer.add_scalar("Expectancy", expectancy, step)
 
     def close(self): self.writer.close()
 

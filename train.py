@@ -6,7 +6,7 @@ from tqdm import tqdm # Barre de progression
 import torch
 import numpy as np
 import pandas as pd
-from rl_trade.compute import calcul_sharpe_ratio, max_dd, calcul_trade_metrics
+from rl_trade.compute import calcul_sharpe_ratio, max_dd
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
@@ -17,8 +17,8 @@ GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
-VALUE_COEF = 0.3
-BELIEF_COEF = 0.2
+VALUE_COEF = 0.2
+BELIEF_COEF = 0.3
 
 # Load Data
 hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
@@ -92,7 +92,6 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         last_value = torch.tensor([next_value.item()], device=DEVICE)
 
     sharpe =  calcul_sharpe_ratio(portfolio_value, btc_value)
-    expectancy =  calcul_trade_metrics(portfolio_value)
     mdd = max_dd(portfolio_value)
     rewards_list = buffer.rewards
     values_list = buffer.values
@@ -103,7 +102,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
     # Clean buffer
     buffer.clear()
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, sharpe, mdd, expectancy)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, sharpe, mdd)
 
 #Save model
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from rl_trade.compute import calcul_sharpe_ratio
+from rl_trade.compute import calcul_sharpe_ratio,max_dd
 
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -22,6 +22,7 @@ env = Env(hour_df, macro_df, price_series)
 TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
+n_days = 0
 
 # Load weights
 macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
@@ -40,7 +41,10 @@ portfolio_history = []
 price_history = []
 actions_history = []
 pnl_history = []
+sharpes = []
+mdd = []
 done = False
+
 for _ in tqdm(range(TEST_STEPS)):
     micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
@@ -56,16 +60,18 @@ for _ in tqdm(range(TEST_STEPS)):
     price_history.append(current_price)
     actions_history.append(action)
     pnl_history.append(env.get_pnl())
+    n_days += 1
+    if n_days == 360:
+        sharpes.add(calcul_sharpe_ratio(portfolio_history, price_history)) 
+        mdd.add(max_dd(portfolio_history))
     if done: break
     micro_obs, macro_obs = next_obs
 results_df = pd.DataFrame({
     'portfolio_value': portfolio_history,
     'btc_value': price_history,
 })
-# Compute sharpe ratio
-sharpe = calcul_sharpe_ratio(portfolio_history, price_history)
 # Display last history value
-print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpe}")
+print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpes} \nMax Drawd Down: {mdd}")
 
 # Plot all historic Bloc
 plt.figure(figsize=(15, 10))
