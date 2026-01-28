@@ -16,18 +16,23 @@ def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low:
     return torch.clamp((return_ * 100) - macro_strat, -1.0, 1.0)
 
 #Compute the sharpe ration
-def calcul_sharpe_ratio(data_p: list[float], data_btc: list[float]) -> float:
+def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> float:
     if len(data_p) < 2: return 0.0
     #compute the return of portfolio
-    portfolio_return = return_log_vec(data_p)
-    btc_return = return_log_vec(data_btc)
+    returns_p = return_log_vec(data_p, device)
+    #btc_return = return_log_vec(data_btc)
     #compute the return excess, mean and the derivating
-    excess = portfolio_return - btc_return
-    excess_avg = torch.mean(excess)
-    excess_std = torch.std(excess)
+    #excess = portfolio_return - btc_return
+    excess_avg = torch.mean(returns_p)
+    excess_std = torch.std(excess_avg)
+    if excess_std < 1e-8: return 0.0
     #compute the sharpe ratio
-    sr = excess_avg/(excess_std + 1e-8)
-    return torch.nan_to_num(sr, nan=0.0)
+    sr_h = excess_avg/excess_std
+    if not year: return torch.nan_to_num(sr_h, nan=0.0)
+    n_periods = 365 * 24
+    fact_y = torch.sqrt(torch.tensor(n_periods, device=device))
+    sr_y = sr_h * fact_y
+    return torch.nan_to_num(sr_y, nan=0.0)
 
 def max_dd(portfolio: list[float]) -> float:
     values = torch.tensor(portfolio)
@@ -43,8 +48,8 @@ def compute_entropy(prob: list[float]): return entropy(prob, base=2)
 
 def profit_and_loss(total_price:list): return  total_price[2] - total_price[3]
 
-def return_log_vec(data: list) -> Tensor:
-    data = torch.tensor(data, dtype=torch.float32)
+def return_log_vec(data: list, device:str) -> Tensor:
+    data = torch.tensor(data, dtype=torch.float32, device=device)
     p_return = torch.log(data[1:]/data[:-1])
     return p_return
 

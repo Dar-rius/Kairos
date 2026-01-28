@@ -46,24 +46,29 @@ mdd = []
 done = False
 
 for _ in tqdm(range(TEST_STEPS)):
-    micro_t = torch.tensor(micro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-    macro_t = torch.tensor(macro_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     action_mask = env.get_action_mask()
+    micro_obs = micro_obs.unsqueeze(0)
+    macro_obs = macro_obs.unsqueeze(0)
     with torch.no_grad():
-        action_t, _, _, _, _, _ = agent.get_action_and_value(micro_t, macro_t, mask_action=action_mask)
-    
+        action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
     action = action_t.item()
     next_obs, _, _, _, done = env.step(action, entropy_b=None)
     current_val = env.calcul_portfolio_value()
     current_price = env.btc_value
-    portfolio_history.append(current_val)
-    price_history.append(current_price)
+    portfolio_history.append(current_val.item())
+    copy_portfolio = portfolio_history.copy()
+    price_history.append(current_price.item())
     actions_history.append(action)
     pnl_history.append(env.get_pnl())
     n_days += 1
-    if n_days == 360:
-        sharpes.add(calcul_sharpe_ratio(portfolio_history, price_history)) 
-        mdd.add(max_dd(portfolio_history))
+    if n_days == 365 or n_days == TEST_STEPS:
+        portfolio_s = pd.Series(copy_portfolio)
+        returns = portfolio_s.pct_change().dropna()
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24) 
+        sharpes.append(sharpe.item()) 
+        mdd.append(max_dd(portfolio_history).item())
+        copy_portfolio.clear()
+    print(len(copy_portfolio))
     if done: break
     micro_obs, macro_obs = next_obs
 results_df = pd.DataFrame({

@@ -9,6 +9,7 @@ import pandas as pd
 from rl_trade.compute import calcul_sharpe_ratio, max_dd
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+DATA_PATH = './data_off/train_test/'
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
@@ -17,17 +18,17 @@ GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
-VALUE_COEF = 0.2
+VALUE_COEF = 0.1
 BELIEF_COEF = 0.3
 
 # Load Data
-hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
-macro_df = pd.read_csv("./data_off/train_test/metric_train.csv").iloc[:, 1:]
-price_series = pd.read_csv("./data_off/train_test/price_close_train.csv")["Close"]
-state_series = pd.read_csv("./data_off/train_test/state_train.csv")["state"]
+hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
+macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
+price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
+state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["state"]
 
-TOTAL_TIMESTAMP = 3000000
-BATCH_SIZE = 64
+TOTAL_TIMESTAMP = 2000000
+BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series)
@@ -91,7 +92,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
         last_value = torch.tensor([next_value.item()], device=DEVICE)
 
-    sharpe =  calcul_sharpe_ratio(portfolio_value, btc_value)
+    sharpe =  calcul_sharpe_ratio(portfolio_value, device=DEVICE)
     mdd = max_dd(portfolio_value)
     rewards_list = buffer.rewards
     values_list = buffer.values

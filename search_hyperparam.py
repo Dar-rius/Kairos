@@ -11,6 +11,7 @@ from rl_trade.compute import calcul_sharpe_ratio
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
+DATA_PATH = './data_off/train_test/'
 
 def objective(trial):
 # Agent Hyperparam
@@ -24,10 +25,10 @@ def objective(trial):
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
 # Load Data
-    hour_df = pd.read_csv("./data_off/train_test/price_train.csv").iloc[:, 1:]
-    macro_df = pd.read_csv("./data_off/train_test/metric_train.csv").iloc[:, 1:]
-    price_series = pd.read_csv("./data_off/train_test/price_close_train.csv")["Close"]
-    state_series = pd.read_csv("./data_off/train_test/state_train.csv")["state"]
+    hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
+    macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
+    price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
+    state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["state"]
 
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
@@ -100,7 +101,7 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
-        sharpe =  calcul_sharpe_ratio(portfolio_value, btc_value)
+        sharpe =  calcul_sharpe_ratio(portfolio_value, device=DEVICE)
         # For optuna
         trial.report(sharpe, epoch)
         if trial.should_prune():
