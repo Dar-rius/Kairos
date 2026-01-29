@@ -6,3 +6,4 @@
 /agent/save
 /runs/
 db.sqlite3
+*.lock
