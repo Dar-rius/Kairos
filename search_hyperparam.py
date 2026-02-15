@@ -39,6 +39,7 @@ def objective(trial):
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
     belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
     agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
+    sharpes = list[float]
     if hasattr(agent, 'actor'):
         agent.belief_head = torch.jit.script(agent.belief_head)
         agent.actor_layer = torch.jit.script(agent.actor_layer)
@@ -101,7 +102,10 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
-        sharpe =  calcul_sharpe_ratio(portfolio_value, device=DEVICE)
+        portfolio_s = pd.Series(portfolio_value)
+        returns = portfolio_s.pct_change().dropna()
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24) 
+        sharpes.append(sharpe.item())
         # For optuna
         trial.report(sharpe, epoch)
         if trial.should_prune():

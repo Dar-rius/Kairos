@@ -5,10 +5,11 @@ from .processing import convert_to_btc, convert_to_usd
 import torch
 from torch import Tensor
 import gymnasium as gym
+from gymnasium import spaces
 
 # ******* ENV **********
 class Env(gym.Env):
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:int=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.device = device
         self.init_usd_amount = amount_usd
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
@@ -24,15 +25,15 @@ class Env(gym.Env):
         self.cost_rate = torch.tensor(cost_rate, device=self.device)
         self.size = self.macro_trade.shape[0]
         self.seq = torch.tensor(24, device=self.device)
-        self.observation_space = [self.hour_trade.shape[1], self.macro_trade.shape[1]]
-        self.action_space = 3
+        self.observation_space = spaces.Discrete(self.hour_trade.shape[1], self.macro_trade.shape[1])
+        self.action_space = spaces.Discrete(3)
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
 
-    def _update_p_values(self):
+    def _update_p_values(self) -> None:
         self.p_values_return[0] = self.p_values_return[1]
         self.p_values_return[1] = self.calcul_portfolio_value()
 
-    def _buy(self):
+    def _buy(self) -> None:
         cost_fees = calcul_cost(self.total_amount[0], self.cost_rate, self.device)
         usd_price = self.total_amount[0] - cost_fees
         self.total_amount[1] = convert_to_btc(usd_price, self.btc_value, self.device)
@@ -40,7 +41,7 @@ class Env(gym.Env):
         self.total_pnl[2] = cost_fees
         self.total_amount[0] = 0
 
-    def _sell(self):
+    def _sell(self) -> None:
         usd_price = convert_to_usd(self.total_amount[1], self.btc_value, self.device)
         cost_fees = calcul_cost(usd_price, self.cost_rate, self.device)
         self.total_amount[0] = usd_price - cost_fees
@@ -49,7 +50,7 @@ class Env(gym.Env):
         self.total_pnl[3] = profit_and_loss(self.total_pnl)
         self.total_amount[1] = 0
 
-    def _all_reset(self, train:bool=True):
+    def _all_reset(self, train:bool=True) -> None:
         if train:
             min_steps_left = 500
             max_macro_idx = self.size - (min_steps_left // 24) - 1
@@ -59,28 +60,28 @@ class Env(gym.Env):
             micro_end = micro_start + 23
             self.time = torch.tensor([random_day, micro_start, micro_end], dtype=torch.int32, device=self.device)
         else: self.time = torch.tensor([0, 0, 23])
-        self.seq = 0
+        self.seq = torch.tensor([0])
         # Reset Portfolio Value
         self.total_amount = torch.tensor([self.init_usd_amount, 0.0], dtype=torch.float32, device=self.device)
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0) # Reset PnL
-        self.btc_value = 0
+        self.btc_value = torch.tensor([0])
 
-    def _next(self):
+    def _next(self) -> None:
         self.time[1] += 1
         self.time[2] += 1
         self.seq += 1
         if self.seq > 23:
             self.time[0] += 1
-            self.seq = 0
+            self.seq = torch.tensor([0])
 
-    def get_pnl(self): return self.total_pnl[3].item()
+    def get_pnl(self) -> Tensor: return self.total_pnl[3].item()
 
     def calcul_portfolio_value(self) -> Tensor:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value, self.device)
 
     # Create a group state
-    def new_state(self) -> tuple[Tensor]:
+    def new_state(self) -> tuple[Tensor, Tensor]:
         daily_trades = self.hour_trade[self.time[1]:self.time[2]]
         macro_days = self.macro_trade[self.time[0]]
         self.btc_value = self.price[self.time[2]]

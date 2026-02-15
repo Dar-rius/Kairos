@@ -16,7 +16,7 @@ def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low:
     return torch.clamp((return_ * 100) - macro_strat, -1.0, 1.0)
 
 #Compute the sharpe ration
-def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> float:
+def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> Tensor:
     if len(data_p) < 2: return 0.0
     #compute the return of portfolio
     returns_p = return_log_vec(data_p, device)
@@ -25,7 +25,7 @@ def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> flo
     #excess = portfolio_return - btc_return
     excess_avg = torch.mean(returns_p)
     excess_std = torch.std(excess_avg)
-    if excess_std < 1e-8: return 0.0
+    if excess_std < 1e-8: return torch.tensor(0.0)
     #compute the sharpe ratio
     sr_h = excess_avg/excess_std
     if not year: return torch.nan_to_num(sr_h, nan=0.0)
@@ -34,19 +34,19 @@ def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> flo
     sr_y = sr_h * fact_y
     return torch.nan_to_num(sr_y, nan=0.0)
 
-def max_dd(portfolio: list[float]) -> float:
+def max_dd(portfolio: list[float]) -> Tensor:
     values = torch.tensor(portfolio)
-    if values.shape[0] < 2: return 0.0
+    if values.shape[0] < 2: return torch.tensor(0.0)
     peak = torch.cummax(values, dim=0).values
     drawdowns = (peak - values) / (peak + 1e-9)
     mdd = torch.max(drawdowns)
     return mdd
 
-def calcul_cost(amount: Tensor, cost_rate: Tensor, device:str): return amount * cost_rate
+def calcul_cost(amount: Tensor, cost_rate: Tensor, device:str) -> Tensor: return amount * cost_rate
 
-def compute_entropy(prob: list[float]): return entropy(prob, base=2)
+#def compute_entropy(prob: list[float]): return entropy(prob, base=2)
 
-def profit_and_loss(total_price:list): return  total_price[2] - total_price[3]
+def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
 
 def return_log_vec(data: list, device:str) -> Tensor:
     data = torch.tensor(data, dtype=torch.float32, device=device)
