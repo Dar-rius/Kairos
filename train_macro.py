@@ -16,8 +16,8 @@ DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
 train_target_set = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
 LR = 0.0008
-EPOCHS = 200
-BATCH_SIZE = 64
+EPOCHS = 500
+BATCH_SIZE = 128
 MACRO_DIM = train_feature_set.shape[1]
 all_y_true = []
 all_y_pred = []
@@ -26,13 +26,13 @@ model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3)
 tscv = TimeSeriesSplit(n_splits=8)
 
 df_full = pd.merge(train_feature_set, train_target_set, left_index=True, right_index=True)
-df_full["state"] = df_full["state"].shift(-1)
+df_full["regime"] = df_full["regime"].shift(-1)
 df_final = df_full.dropna()
-feature_cols = ['mvrv_z_score','nvt_smooth','hashRate_change','log_return','drawdown_micro','rsi_7','rsi_14', 'mvrv_momentum', 'nvt_dynamic', 'rsi_slop']
+feature_cols = ['mvrv_z_score','nvt_smooth','hashRate_change','log_return','drawdown_micro', 'volatility',  'vol_park', 'rsi_7','rsi_14', 'mvrv_momentum', 'nvt_dynamic', 'rsi_slop']
 X = df_final[feature_cols].values.astype(np.float32)
-y = df_final['state'].values.astype(np.int64)
+y = df_final['regime'].values.astype(np.int64)
 class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
-weights_tensor = torch.FloatTensor([.9, 3.7, 5.5])
+weights_tensor = torch.FloatTensor([.9, 4.7, 5.5])
 fold = 0
 
 for train_index, val_index in tscv.split(X):
@@ -65,7 +65,7 @@ for train_index, val_index in tscv.split(X):
     model.eval()
     with torch.no_grad():
         _, val_logits = model(X_val_tensor)
-        predictions = torch.argmax(val_logits, dim=1).numpy()
+        predictions = torch.argmax(val_logits, dim=1).cpu().numpy()
     all_y_true.extend(y_val)
     all_y_pred.extend(predictions)
     # Optionnel : Afficher la précision juste pour ce fold

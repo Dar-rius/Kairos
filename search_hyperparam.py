@@ -18,7 +18,6 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.95, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.95, 0.99)
-    clip_eps = 0.2
     ent_coef = trial.suggest_float("ent_coef", 0.001, 0.1, log=True)
     value_coef = trial.suggest_float("value_coef", 0.005, 0.5, log=True)
     belief_coef = trial.suggest_float("belief_coef", 0.005, 0.5, log=True)
