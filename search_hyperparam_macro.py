@@ -13,14 +13,12 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
+from torch.utils.data import TensorDataset, DataLoader
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
 train_target_set = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
-all_y_true = []
-all_y_pred = []
 MACRO_DIM = train_feature_set.shape[1]
-model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3)
 df_full = pd.merge(train_feature_set, train_target_set, left_index=True, right_index=True)
 df_full["regime"] = df_full["regime"].shift(-1)
 df_final = df_full.dropna()
@@ -33,51 +31,54 @@ def objective(trial):
 # Agent Hyperparam
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
-    n_splits = trial.suggest_int('n_splits', 2, 20)
     weights_1 = trial.suggest_float("weights_1", 0.1, 10.0)
     weights_2 = trial.suggest_float("weights_2", 0.1, 10.0)
     weights_3 = trial.suggest_float("weights_3", 0.1, 10.0)
 
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    tscv = TimeSeriesSplit(n_splits=5)
     weights_tensor = torch.FloatTensor([weights_1, weights_2, weights_3])
 
     #Search Best Params
-    for epoch_ in range(1, 100 + 1):
-        fold_acc = 0
-        for train_index, val_index in tscv.split(X):
-            x_train_raw, x_val_raw = X[train_index], X[val_index]
-            y_train, y_val = y[train_index], y[val_index]
+    fold_acc_list: list[float] = []
+    for train_index, val_index in tscv.split(X):
+        x_train_raw, x_val_raw = X[train_index], X[val_index]
+        y_train, y_val = y[train_index], y[val_index]
 
-            scaler = StandardScaler()
-            x_train_scaled = scaler.fit_transform(x_train_raw)
-            x_val_scaled = scaler.transform(x_val_raw)
+        scaler = StandardScaler()
+        x_train_scaled = scaler.fit_transform(x_train_raw)
+        x_val_scaled = scaler.transform(x_val_raw)
 
-            x_train_tensor = torch.FloatTensor(x_train_scaled)
-            y_train_tensor = torch.LongTensor(y_train)
-            x_val_tensor = torch.FloatTensor(x_val_scaled)
+        # Création des DataLoaders pour utiliser le batch_size
+        train_dataset = TensorDataset(torch.FloatTensor(x_train_scaled), torch.LongTensor(y_train))
+        # shuffle=False est crucial en séries temporelles
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+        x_val_tensor = torch.FloatTensor(x_val_scaled)
+        y_val_tensor = torch.LongTensor(y_val)
 
-            criterion = nn.CrossEntropyLoss(weight=weights_tensor)
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+        model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3)
+        criterion = nn.CrossEntropyLoss(weight=weights_tensor)
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+        for _ in range(200):
             model.train()
-            for _ in range(200):
+            for batch_x, batch_y in train_loader:
                 optimizer.zero_grad()
-                _, logits = model(x_train_tensor)
-                loss = criterion(logits, y_train_tensor)
+                _, logits = model(batch_x)
+                loss = criterion(logits, batch_y)
                 loss.backward()
                 optimizer.step()
-            
-            model.eval()
-            with torch.no_grad():
-                _, val_logits = model(x_val_tensor)
-                predictions = torch.argmax(val_logits, dim=1).cpu().numpy()
-            all_y_true.extend(y_val)
-            all_y_pred.extend(predictions)
-            fold_acc = np.mean(predictions == y_val)
-        # For optuna
-        trial.report(fold_acc, epoch_)
-        if trial.should_prune():
-            raise optuna.exceptions.TrialPruned()
-    return fold_acc
+        
+        model.eval()
+        with torch.no_grad():
+            _, val_logits = model(x_val_tensor)
+            predictions = torch.argmax(val_logits, dim=1).cpu().numpy()
+        fold_acc = np.mean(predictions == y_val)
+        fold_acc_list.append(fold_acc)
+    mean_acc = np.mean(fold_acc_list)
+    # For optuna
+    trial.report(mean_acc, 1)
+    if trial.should_prune():
+        raise optuna.exceptions.TrialPruned()
+    return mean_acc
 
 study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
