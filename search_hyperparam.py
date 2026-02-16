@@ -28,7 +28,7 @@ def objective(trial):
     macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
     price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
     state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
-
+    
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
     env = Env(hour_df, macro_df, price_series, state_series)
@@ -41,12 +41,12 @@ def objective(trial):
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
-    sharpes = []
+    sharpes: list[float] = []
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
     for epoch in range(1, 100 + 1):
-        cumulative_reward: float = 0.0
+        cumulative_reward = 0.0
         btc_value: list[float] = []
         portfolio_value: list[float] = []
         # Collecte phase
@@ -81,7 +81,7 @@ def objective(trial):
         with torch.inference_mode():
             next_micro_t = micro_obs.unsqueeze(0)
             next_macro_t = macro_obs.unsqueeze(0)
-            _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
+            _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
             last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         rewards_list = buffer.rewards

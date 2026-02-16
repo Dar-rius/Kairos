@@ -15,6 +15,7 @@ regime_mapping = {
         "Crisis": 2
         }
 for dataset in [metric_train, metric_pretrain, metric_test]:
+    print(dataset.isna().sum())
     dataset["regime"] = dataset["regime"].map(regime_mapping)
     dataset["regime"] = dataset["regime"].astype(int)
 

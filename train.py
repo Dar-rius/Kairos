@@ -2,7 +2,7 @@ from rl_trade.env import Env
 from agent.ppo import PPOTrainer, Writer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
-from tqdm import tqdm # Barre de progression
+from tqdm import tqdm
 import torch
 import numpy as np
 import pandas as pd
@@ -63,18 +63,16 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         with torch.inference_mode():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-        action = action_t
-        value = value_t
-        log_prob = log_prob_t
-        next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
+        next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+        done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
         buffer.insert(
             micro_state=micro_t,
             macro_state=macro_t,
             action=action_t,
             old_log_prob=log_prob_t,
             reward=reward,
-            value=value,
-            dones = 1.0 if done else 0.0,
+            value=value_t,
+            dones = done_casted,
             target_regime=target_regime
         )
         cumulative_reward += reward
@@ -89,7 +87,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     with torch.inference_mode():
         next_micro_t = micro_obs.unsqueeze(0)
         next_macro_t = macro_obs.unsqueeze(0)
-        _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, action_masked)
+        _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
         last_value = torch.tensor([next_value.item()], device=DEVICE)
 
     sharpe =  calcul_sharpe_ratio(portfolio_value, device=DEVICE)
