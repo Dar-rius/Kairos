@@ -8,7 +8,7 @@ import gymnasium as gym
 from gymnasium import spaces
 
 # ******* ENV **********
-class Env(gym.Env):
+class Env():
     def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.device = device
         self.init_usd_amount = amount_usd
@@ -25,8 +25,8 @@ class Env(gym.Env):
         self.cost_rate = torch.tensor(cost_rate, device=self.device)
         self.size = self.macro_trade.shape[0]
         self.seq = torch.tensor(24, device=self.device)
-        self.observation_space = spaces.Discrete(self.hour_trade.shape[1], self.macro_trade.shape[1])
-        self.action_space = spaces.Discrete(3)
+        self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
+        self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
 
     def _update_p_values(self) -> None:
@@ -75,7 +75,7 @@ class Env(gym.Env):
             self.time[0] += 1
             self.seq = torch.tensor([0])
 
-    def get_pnl(self) -> Tensor: return self.total_pnl[3].item()
+    def get_pnl(self) -> float: return self.total_pnl[3].item()
 
     def calcul_portfolio_value(self) -> Tensor:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value, self.device)
@@ -95,7 +95,7 @@ class Env(gym.Env):
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
     # Reset the env to 0
-    def reset(self, train:bool=True):
+    def reset(self, train:bool=True) -> tuple[Tensor, Tensor]:
         self._all_reset(train)
         return self.new_state()
 

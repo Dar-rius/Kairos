@@ -27,26 +27,21 @@ def objective(trial):
     hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
     macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
     price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
-    state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["state"]
+    state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
-    NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
     env = Env(hour_df, macro_df, price_series, state_series)
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
     belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
     agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
-    sharpes = list[float]
-    if hasattr(agent, 'actor'):
-        agent.belief_head = torch.jit.script(agent.belief_head)
-        agent.actor_layer = torch.jit.script(agent.actor_layer)
-        agent.critic = torch.jit.script(agent.critic)
     trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, device=DEVICE)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
+    sharpes = []
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
@@ -63,16 +58,14 @@ def objective(trial):
             with torch.inference_mode():
                 action_t, log_prob_t, _, value_t, _, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            action = action_t
-            value = value_t
-            next_obs, reward, target_regime, truncate, done = env.step(action, belief_entropy)
+            next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
-                action=action,
+                action=action_t,
                 old_log_prob=log_prob_t,
                 reward=reward,
-                value=value,
+                value=value_t,
                 dones = 1.0 if done else 0.0,
                 target_regime=target_regime
             )
@@ -101,15 +94,18 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
-        portfolio_s = pd.Series(portfolio_value)
-        returns = portfolio_s.pct_change().dropna()
-        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24) 
-        sharpes.append(sharpe.item())
+        returns_s = pd.Series(portfolio_value).pct_change().dropna()
+        if len(returns_s) > 1 and returns_s.std() > 1e-8:
+            sharpe_epoch = (returns_s.mean() / returns_s.std()) * np.sqrt(365 * 24)
+        else:
+            sharpe_epoch = 0.0
+
+        sharpes.append(sharpe_epoch)
         # For optuna
-        trial.report(sharpe, epoch)
+        trial.report(sharpe_epoch, epoch)
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
-    return sharpe
+    return np.mean(sharpes[-10:]) if len(sharpes) > 10 else np.mean(sharpes)
 
 study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
