@@ -60,12 +60,12 @@ class Env():
             micro_end = micro_start + 23
             self.time = torch.tensor([random_day, micro_start, micro_end], dtype=torch.int32, device=self.device)
         else: self.time = torch.tensor([0, 0, 23])
-        self.seq = torch.tensor([0])
+        self.seq.fill_(0)
         # Reset Portfolio Value
         self.total_amount = torch.tensor([self.init_usd_amount, 0.0], dtype=torch.float32, device=self.device)
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.total_pnl.fill_(0.0) # Reset PnL
-        self.btc_value = torch.tensor([0])
+        self.total_pnl.fill_(0.0)
+        self.btc_value.fill_(0.0)
 
     def _next(self) -> None:
         self.time[1] += 1
@@ -100,9 +100,9 @@ class Env():
         return self.new_state()
 
     # The next step of env
-    def step(self, action:Tensor, entropy_b:Tensor=None) -> tuple[Tensor]:
+    def step(self, action:Tensor, entropy_b:Tensor|None=None):
         state = self.new_state()
-        future_idx = min(self.time[0] + 1, self.size - 1)
+        future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
         # Sell
         if action == 2: self._sell()
@@ -116,4 +116,4 @@ class Env():
         truncate_t = torch.tensor(truncate, device=self.device)
         #Compute the reward
         reward = reward_func(return_, action, entropy_b)
-        return (state, reward, state_pred, truncate_t, done_t)
+        return state, reward, state_pred, truncate_t, done_t

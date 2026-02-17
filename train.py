@@ -25,9 +25,9 @@ BELIEF_COEF = 0.3
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
-state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["state"]
+state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
-TOTAL_TIMESTAMP = 2000000
+TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -37,10 +37,6 @@ STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
 belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
 agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
-if hasattr(agent, 'actor'):
-    agent.belief_head = torch.jit.script(agent.belief_head)
-    agent.actor_layer = torch.jit.script(agent.actor_layer)
-    agent.critic = torch.jit.script(agent.critic)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF, device=DEVICE)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
@@ -54,6 +50,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     cumulative_pnl: float = 0.0
     portfolio_value: list[float] = []
     btc_value: list[float] = []
+    action_counts = {0: 0, 1: 0, 2: 0}
     # Collecte phase
     for step in range(ROLLOUT_STEPS):
         global_step += 1
@@ -64,6 +61,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
         next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+        action_counts[int(action_t)] += 1
         done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
         buffer.insert(
             micro_state=micro_t,
@@ -90,7 +88,10 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
         last_value = torch.tensor([next_value.item()], device=DEVICE)
 
-    sharpe =  calcul_sharpe_ratio(portfolio_value, device=DEVICE)
+    hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
+    buy_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
+    sell_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
+    sharpe =  calcul_sharpe_ratio(portfolio_value) 
     mdd = max_dd(portfolio_value)
     rewards_list = buffer.rewards
     values_list = buffer.values
@@ -101,7 +102,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
     # Clean buffer
     buffer.clear()
-    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, sharpe, mdd)
+    writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, sharpe, mdd, hold_pct, buy_pct, sell_pct)
 
 #Save model
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')

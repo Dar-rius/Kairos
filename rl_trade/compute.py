@@ -5,34 +5,30 @@ import math
 import torch
 from torch import Tensor
 
-BETA = .25
+BETA = .1
 
-def reward_func(return_: Tensor, action: Tensor, entropy_b: Tensor, entropy_low: float = .3) -> float:
+def reward_func(return_:Tensor, action:Tensor, entropy_b:Tensor|None, entropy_low:float =.3) -> float:
     if entropy_b is None: return 0.0
     action = torch.where(action == 2, -1.0, action.float())
-    # Compute the macro strategy for detect the state of market
+    raw_return = return_ * 100.0
     second_macro = torch.clamp(entropy_b - entropy_low, min=0.0)
     macro_strat = torch.abs(action) * BETA *  second_macro
-    return torch.clamp((return_ * 100) - macro_strat, -1.0, 1.0)
+    laziness_penalty = 0.0
+    if action == 0 and entropy_b < 0.2: laziness_penalty = 0.05
+    final_reward = torch.tanh(raw_return - macro_strat - laziness_penalty)
+    return  final_reward.item()
 
 #Compute the sharpe ration
-def calcul_sharpe_ratio(data_p: list[float], device:str, year:bool=False) -> Tensor:
-    if len(data_p) < 2: return 0.0
-    #compute the return of portfolio
-    returns_p = return_log_vec(data_p, device)
-    #btc_return = return_log_vec(data_btc)
-    #compute the return excess, mean and the derivating
-    #excess = portfolio_return - btc_return
-    excess_avg = torch.mean(returns_p)
-    excess_std = torch.std(excess_avg)
-    if excess_std < 1e-8: return torch.tensor(0.0)
-    #compute the sharpe ratio
-    sr_h = excess_avg/excess_std
-    if not year: return torch.nan_to_num(sr_h, nan=0.0)
-    n_periods = 365 * 24
-    fact_y = torch.sqrt(torch.tensor(n_periods, device=device))
-    sr_y = sr_h * fact_y
-    return torch.nan_to_num(sr_y, nan=0.0)
+def calcul_sharpe_ratio(portfolio_value: list) -> float:
+    if len(portfolio_value) < 2:
+        return 0.0
+    val_arr = np.array(portfolio_value)
+    returns = np.diff(val_arr) / val_arr[:-1]
+    std_dev = np.std(returns)
+    if std_dev > 1e-8:
+        sharpe = (np.mean(returns) / std_dev) * np.sqrt(365 * 24)
+        return float(sharpe)
+    return 0.0
 
 def max_dd(portfolio: list[float]) -> Tensor:
     values = torch.tensor(portfolio)

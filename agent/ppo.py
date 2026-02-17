@@ -12,7 +12,7 @@ class Writer:
     def __init__(self, path:str):
         self.writer = SummaryWriter(log_dir=path)
 
-    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float, pnl:float, sharpe:float, mdd:float):
+    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float, pnl:float, sharpe:float, mdd:float, hold_pct:float, buy_pct:float, sell_pct:float):
         self.writer.add_scalar("Policy Loss", policy_loss, step)
         self.writer.add_scalar("Critic Loss", critic_loss, step)
         self.writer.add_scalar("Belief Loss", belief_loss, step)
@@ -22,7 +22,9 @@ class Writer:
         self.writer.add_scalar("PNL", pnl, step)
         self.writer.add_scalar("Sharpe ratio", sharpe, step)
         self.writer.add_scalar("Max Draw Down", mdd, step)
-
+        self.writer.add_scalar("Hold", hold_pct, step)
+        self.writer.add_scalar("Buy", buy_pct, step)
+        self.writer.add_scalar("Sell", sell_pct, step)
     def close(self): self.writer.close()
 
 # Belief PPO Implementation
@@ -43,7 +45,7 @@ class PPOTrainer:
         self.ce_loss = nn.CrossEntropyLoss()
         self.device = device
 
-    def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor]:
+    def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor, Tensor]:
         gae: float = 0.0
         mask = 1.0 - dones
         next_values = torch.cat((values[1:], last_value), 0)

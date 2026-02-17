@@ -16,9 +16,9 @@ from torch.utils.data import TensorDataset, DataLoader
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
 train_target_set = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
-LR = 0.001
+LR = 0.0005
 EPOCHS = 500
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 MACRO_DIM = train_feature_set.shape[1]
 all_y_true = []
 all_y_pred = []
