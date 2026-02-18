@@ -68,7 +68,6 @@ for _ in tqdm(range(TEST_STEPS)):
         sharpes.append(sharpe.item()) 
         mdd.append(max_dd(portfolio_history).item())
         copy_portfolio.clear()
-    print(len(copy_portfolio))
     if done: break
     micro_obs, macro_obs = next_obs
 results_df = pd.DataFrame({

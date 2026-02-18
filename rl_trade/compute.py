@@ -5,30 +5,28 @@ import math
 import torch
 from torch import Tensor
 
-BETA = .1
+BETA = .2
 
-def reward_func(return_:Tensor, action:Tensor, entropy_b:Tensor|None, entropy_low:float =.3) -> float:
+def reward_func(return_:Tensor, action:Tensor, entropy_b:Tensor|None, entropy_low: float = .3) -> float:
     if entropy_b is None: return 0.0
     action = torch.where(action == 2, -1.0, action.float())
-    raw_return = return_ * 100.0
+    raw_return = return_ * 100
     second_macro = torch.clamp(entropy_b - entropy_low, min=0.0)
     macro_strat = torch.abs(action) * BETA *  second_macro
-    laziness_penalty = 0.0
-    if action == 0 and entropy_b < 0.2: laziness_penalty = 0.05
-    final_reward = torch.tanh(raw_return - macro_strat - laziness_penalty)
+    final_reward = torch.tanh(raw_return - macro_strat)
     return  final_reward.item()
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
-    if len(portfolio_value) < 2:
-        return 0.0
+    if len(portfolio_value) < 2: return 0.0
     val_arr = np.array(portfolio_value)
     returns = np.diff(val_arr) / val_arr[:-1]
     std_dev = np.std(returns)
     if std_dev > 1e-8:
         sharpe = (np.mean(returns) / std_dev) * np.sqrt(365 * 24)
         return float(sharpe)
-    return 0.0
+    else:
+        return 0.0
 
 def max_dd(portfolio: list[float]) -> Tensor:
     values = torch.tensor(portfolio)
