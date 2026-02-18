@@ -13,12 +13,12 @@ DATA_PATH = './data_off/train_test/'
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
-LR = 3e-5
-GAMMA = 0.97
+LR = 3e-4
+GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
-VALUE_COEF = 0.1
+VALUE_COEF = 0.5
 BELIEF_COEF = 0.3
 
 # Load Data

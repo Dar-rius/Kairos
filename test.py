@@ -34,7 +34,7 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
 
 print("Run the Backtest...")
-micro_obs, macro_obs = env.reset(train=False)
+micro_obs, macro_obs = env.reset()
 
 # Tracking
 portfolio_history = []

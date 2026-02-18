@@ -5,7 +5,7 @@ import math
 import torch
 from torch import Tensor
 
-BETA = .2
+BETA = .25
 
 def reward_func(return_:Tensor, action:Tensor, entropy_b:Tensor|None, entropy_low: float = .3) -> float:
     if entropy_b is None: return 0.0
