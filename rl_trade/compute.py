@@ -42,11 +42,16 @@ def reward_func(return_:Tensor, action:Tensor, p_value_hist: deque[float]) -> fl
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
     if len(portfolio_value) < 2: return 0.0
-    val_arr = np.array(portfolio_value)
-    returns = np.diff(val_arr) / val_arr[:-1]
+    val_arr = np.array(portfolio_value, dtype=np.float64)
+    
+    returns = np.diff(val_arr) / (val_arr[:-1] + 1e-9)
+    returns = np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
+    
     std_dev = np.std(returns)
     if std_dev > 1e-8:
         sharpe = (np.mean(returns) / std_dev) * np.sqrt(365 * 24)
+        if np.isnan(sharpe) or np.isinf(sharpe):
+            return 0.0
         return float(sharpe)
     else:
         return 0.0
