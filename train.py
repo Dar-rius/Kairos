@@ -18,8 +18,8 @@ GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.01
-VALUE_COEF = 0.5
-BELIEF_COEF = 0.3
+VALUE_COEF = 0.1
+BELIEF_COEF = 0.2
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -28,7 +28,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
 TOTAL_TIMESTAMP = 1000000
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series)

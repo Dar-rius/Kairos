@@ -37,6 +37,7 @@ class Agent(nn.Module):
         self.belief_head = pretrained_model
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
         
+
         # --- FUSION HIÉRARCHIQUE ---
         # 128 (Micro) + 32 (Macro Context) + 3 (Macro Explicit Prediction)
         fusion_dim = 128 + 32 + num_regimes
