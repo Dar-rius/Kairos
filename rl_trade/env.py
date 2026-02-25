@@ -6,11 +6,10 @@ import torch
 from torch import Tensor
 import gymnasium as gym
 from gymnasium import spaces
-from collections import deque
 
 # ******* ENV **********
 class Env():
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, window_size:int= 720, device:str='cuda:0'):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
         self.device = device
         self.init_usd_amount = amount_usd
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
@@ -29,8 +28,8 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.window_size = window_size
-        self.p_value_hist: deque[float]
+        self.ema_return:float = 0.0
+        self.ema_sq_return:float = 0.0
 
     def _update_p_values(self) -> None:
         self.p_values_return[0] = self.p_values_return[1]
@@ -69,7 +68,8 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
-        self.p_value_hist = deque([self.init_usd_amount], maxlen=self.window_size)
+        self.ema_return = 0.0
+        self.ema_sq_return = 0.0
 
     def _next(self) -> None:
         self.time[1] += 1
@@ -118,8 +118,6 @@ class Env():
         done_t = torch.tensor(done, device=self.device)
         truncate = True if self.calcul_portfolio_value() == 0 else False
         truncate_t = torch.tensor(truncate, device=self.device)
-        p_val = self.calcul_portfolio_value()
-        self.p_value_hist.append(p_val.item())
         #Compute the reward
-        reward = reward_func(return_, action, self.p_value_hist)
+        reward, self.ema_return, self.ema_sq_return = reward_func(return_, action, self.ema_return, self.ema_sq_return)
         return state, reward, state_pred, truncate_t, done_t

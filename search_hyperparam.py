@@ -41,7 +41,7 @@ def objective(trial):
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
-    rewards: list[float] = []
+    sharpes: list[float] = []
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
@@ -94,22 +94,22 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
-        #returns_s = pd.Series(portfolio_value).pct_change().dropna()
-        #if len(returns_s) > 1 and returns_s.std() > 1e-8:
-            #sharpe_epoch = (returns_s.mean() / returns_s.std()) * np.sqrt(365 * 24)
-        #else:
-            #sharpe_epoch = 0.0
+        returns_s = pd.Series(portfolio_value).pct_change().dropna()
+        if len(returns_s) > 1 and returns_s.std() > 1e-8:
+            sharpe_epoch = (returns_s.mean() / returns_s.std()) * np.sqrt(365 * 24)
+        else:
+            sharpe_epoch = 0.0
 
-        rewards.append(cumulative_reward)
+        sharpes.append(sharpe_epoch)
         # For optuna
-        trial.report(cumulative_reward, epoch)
+        trial.report(sharpe_epoch, epoch)
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
-    return np.mean(rewards[-10:]) if len(rewards) > 10 else np.mean(rewards)
+    return np.mean(sharpes[-10:]) if len(sharpes) > 10 else np.mean(sharpes)
 
 study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=150)
+study.optimize(objective, n_trials=100)
 print(study.best_params)

@@ -28,20 +28,7 @@ tscv = TimeSeriesSplit(n_splits=8)
 df_full = pd.merge(train_feature_set, train_target_set, left_index=True, right_index=True)
 df_full["regime"] = df_full["regime"].shift(-1)
 df_final = df_full.dropna()
-feature_cols = ['mvrv_z_score',
-                'hashRate_change',
-                'log_return',
-                'drawdown_micro',
-                'volatility',
-                'vol_park',
-                'rsi_7',
-                'rsi_14',
-                'mvrv_momentum',
-                'nvt_dynamic',
-                'rsi_slop',
-                'mom_24h', 
-                'mom_168h',
-                'mom_168h_z']
+feature_cols = ['mvrv_z_score','nvt_smooth','hashRate_change','log_return','drawdown_micro', 'volatility',  'vol_park', 'rsi_7','rsi_14', 'mvrv_momentum', 'nvt_dynamic', 'rsi_slop']
 X = df_final[feature_cols].values.astype(np.float32)
 y = df_final['regime'].values.astype(np.int64)
 weights_tensor = torch.FloatTensor([.9, 4.7, 7.5])

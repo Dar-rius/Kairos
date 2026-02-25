@@ -6,38 +6,32 @@ import torch
 from torch import Tensor
 from collections import deque
 
-BETA = .2
+BETA = .25
 
-def reward_func(return_:Tensor, action:Tensor, p_value_hist: deque[float]) -> float:
+def reward_func(return_:Tensor, action:Tensor, ema_return:float, ema_sq_return:float, eta: float = 0.01) -> tuple:
     action = torch.where(action == 2, -1, action.int())
-    trade_executed = False
-    if action != 0: trade_executed = True
-    if torch.isnan(return_) or torch.isinf(return_): return -1.0 
-    
-    step_return = return_.item()
-    
-    # Paramètres fixes et robustes
-    alpha = 0.88
-    beta = 0.88
-    # On met une aversion globale très forte (ex: 3.0 ou 4.0 au lieu de 2.25)
-    lmbda = 3.5 
-    
-    # Calcul strict de l'utilité
-    if step_return >= 0:
-        v_x = step_return ** alpha
-    else:
-        v_x = -lmbda * (abs(step_return) ** beta)
+    fee_penalty = 0.001 if action != 0 else 0
+    net_return = return_.item() - fee_penalty
 
-    fee_penalty = 0.001 if trade_executed else 0.0
-    
-    # Drawdown Penalty exponentiel
-    current_dd = max_dd(p_value_hist, True).item()
-    dd_penalty = 0.0
-    if current_dd > 0.05: # Tolérance très basse (5%)
-        dd_penalty = (current_dd * 2.0) ** 2 # La douleur monte au carré 
+    A_prev = ema_return
+    B_prev = ema_sq_return
 
-    reward = v_x - fee_penalty - dd_penalty
-    return float(np.clip(reward, -1.0, 1.0))
+    variance:float = B_prev - (A_prev ** 2)
+    if variance < 1e-8:
+        variance = 1e-8
+
+    delta_A = net_return - A_prev
+    delta_B = (net_return ** 2) - B_prev
+
+    numerator = (B_prev * delta_A) - (0.5 * A_prev * delta_B)
+    denominator = math.pow(variance, 1.5)
+    dsr = numerator / denominator
+
+    ema_return = A_prev + eta * delta_A
+    ema_sq_return = B_prev + eta * delta_B
+
+    reward = np.clip(dsr, -1.0, 1.0)
+    return (reward.item(), ema_return, ema_sq_return)
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
@@ -74,9 +68,9 @@ def calcul_cost(amount: Tensor, cost_rate: Tensor, device:str) -> Tensor: return
 
 def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
 
-def return_log_vec(data:list[float], device:str) -> Tensor:
-    data_t = torch.as_tensor(data, dtype=torch.float32, device=device)
-    p_return = torch.log(data_t[1:]/data_t[:-1])
+def return_log_vec(data: list, device:str) -> Tensor:
+    data = torch.tensor(data, dtype=torch.float32, device=device)
+    p_return = torch.log(data[1:]/data[:-1])
     return p_return
 
 #Compute the return log

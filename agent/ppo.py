@@ -72,8 +72,8 @@ class PPOTrainer:
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
+        all_indices = torch.randperm(dataset_size, device=self.device)
         for _ in range(epochs):
-            all_indices = torch.randperm(dataset_size, device=self.device)
             for start in (0, dataset_size, batch_size):
                 end = start + batch_size
                 idx = all_indices[start:end]
