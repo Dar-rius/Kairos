@@ -51,14 +51,13 @@ for _ in tqdm(range(TEST_STEPS)):
     macro_obs = macro_obs.unsqueeze(0)
     with torch.no_grad():
         action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
-    action = action_t.item()
-    next_obs, _, _, _, done = env.step(action, entropy_b=None)
+    next_obs, _, _, _, done = env.step(action_t, entropy_b=None)
     current_val = env.calcul_portfolio_value()
     current_price = env.btc_value
     portfolio_history.append(current_val.item())
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price.item())
-    actions_history.append(action)
+    actions_history.append(action_t.item())
     pnl_history.append(env.get_pnl())
     n_days += 1
     if n_days == 365 or n_days == TEST_STEPS:
