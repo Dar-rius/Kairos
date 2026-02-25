@@ -18,7 +18,7 @@ macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 
 # Initialization
-env = Env(hour_df, macro_df, price_series)
+env = Env(hour_df, macro_df, price_series, amount_usd=100000.0)
 TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space

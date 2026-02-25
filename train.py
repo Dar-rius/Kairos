@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import pandas as pd
 from rl_trade.compute import calcul_sharpe_ratio, max_dd
+from collections import deque
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 DATA_PATH = './data_off/train_test/'
@@ -48,8 +49,8 @@ global_step = 0
 for update in tqdm(range(1, NUM_UPDATE + 1)):
     cumulative_reward: float = 0.0
     cumulative_pnl: float = 0.0
-    portfolio_value: list[float] = []
-    btc_value: list[float] = []
+    portfolio_value: deque[float] = deque()
+    btc_value: deque[float] = deque()
     action_counts = {0: 0, 1: 0, 2: 0}
     # Collecte phase
     for step in range(ROLLOUT_STEPS):
@@ -91,7 +92,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
     buy_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
     sell_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
-    sharpe =  calcul_sharpe_ratio(portfolio_value) 
+    sharpe =  calcul_sharpe_ratio(list(portfolio_value))
     mdd = max_dd(portfolio_value)
     rewards_list = buffer.rewards
     values_list = buffer.values

@@ -4,33 +4,40 @@ from scipy.stats import entropy
 import math
 import torch
 from torch import Tensor
+from collections import deque
 
 BETA = .2
 
-def reward_func(return_:Tensor, action:Tensor, ema_return:float, ema_sq_return:float, eta: float = 0.01) -> tuple:
+def reward_func(return_:Tensor, action:Tensor, p_value_hist: deque[float]) -> float:
     action = torch.where(action == 2, -1, action.int())
-    fee_penalty = 0.001 if action != 0 else 0
-    net_return = return_.item() - fee_penalty
+    trade_executed = False
+    if action != 0: trade_executed = True
+    if torch.isnan(return_) or torch.isinf(return_): return -1.0 
+    
+    step_return = return_.item()
+    
+    # Paramètres fixes et robustes
+    alpha = 0.88
+    beta = 0.88
+    # On met une aversion globale très forte (ex: 3.0 ou 4.0 au lieu de 2.25)
+    lmbda = 3.5 
+    
+    # Calcul strict de l'utilité
+    if step_return >= 0:
+        v_x = step_return ** alpha
+    else:
+        v_x = -lmbda * (abs(step_return) ** beta)
 
-    A_prev = ema_return
-    B_prev = ema_sq_return
+    fee_penalty = 0.001 if trade_executed else 0.0
+    
+    # Drawdown Penalty exponentiel
+    current_dd = max_dd(p_value_hist, True).item()
+    dd_penalty = 0.0
+    if current_dd > 0.05: # Tolérance très basse (5%)
+        dd_penalty = (current_dd * 2.0) ** 2 # La douleur monte au carré 
 
-    variance:float = B_prev - (A_prev ** 2)
-    if variance < 1e-8:
-        variance = 1e-8
-
-    delta_A = net_return - A_prev
-    delta_B = (net_return ** 2) - B_prev
-
-    numerator = (B_prev * delta_A) - (0.5 * A_prev * delta_B)
-    denominator = math.pow(variance, 1.5)
-    dsr = numerator / denominator
-
-    ema_return = A_prev + eta * delta_A
-    ema_sq_return = B_prev + eta * delta_B
-
-    reward = np.clip(dsr, -1.0, 1.0)
-    return (reward.item(), ema_return, ema_sq_return)
+    reward = v_x - fee_penalty - dd_penalty
+    return float(np.clip(reward, -1.0, 1.0))
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
@@ -44,9 +51,9 @@ def calcul_sharpe_ratio(portfolio_value: list) -> float:
     else:
         return 0.0
 
-def max_dd(portfolio: list[float], dd:bool=False) -> Tensor:
-    values = torch.tensor(portfolio)
-    if values.shape[-1] < 2: return torch.tensor(0.0)
+def max_dd(portfolio: deque[float], dd:bool=False) -> Tensor:
+    values = torch.tensor(list(portfolio), dtype=torch.float32)
+    if values.shape[0] < 2: return torch.tensor(0.0)
     if dd:
         peak = torch.max(values)
         drawdowns = (peak - values[-1]) / (peak + 1e-9)  
