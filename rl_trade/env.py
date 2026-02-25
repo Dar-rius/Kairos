@@ -6,10 +6,11 @@ import torch
 from torch import Tensor
 import gymnasium as gym
 from gymnasium import spaces
+from typing import Any
 
 # ******* ENV **********
 class Env():
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cuda:0'):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu'):
         self.device = device
         self.init_usd_amount = amount_usd
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
@@ -28,24 +29,24 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.ema_return:float = 0.0
-        self.ema_sq_return:float = 0.0
+        self.ema_return = 0.0
+        self.ema_sq_return = 0.0
 
     def _update_p_values(self) -> None:
         self.p_values_return[0] = self.p_values_return[1]
         self.p_values_return[1] = self.calcul_portfolio_value()
 
     def _buy(self) -> None:
-        cost_fees = calcul_cost(self.total_amount[0], self.cost_rate, self.device)
+        cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
         usd_price = self.total_amount[0] - cost_fees
-        self.total_amount[1] = convert_to_btc(usd_price, self.btc_value, self.device)
+        self.total_amount[1] = convert_to_btc(usd_price, self.btc_value)
         self.total_pnl[0] = self.total_amount[0]
         self.total_pnl[2] = cost_fees
         self.total_amount[0] = 0
 
     def _sell(self) -> None:
-        usd_price = convert_to_usd(self.total_amount[1], self.btc_value, self.device)
-        cost_fees = calcul_cost(usd_price, self.cost_rate, self.device)
+        usd_price = convert_to_usd(self.total_amount[1], self.btc_value)
+        cost_fees = calcul_cost(usd_price, self.cost_rate)
         self.total_amount[0] = usd_price - cost_fees
         self.total_pnl[2] += cost_fees
         self.total_pnl[1] = usd_price - self.total_pnl[0]
@@ -82,7 +83,7 @@ class Env():
     def get_pnl(self) -> float: return self.total_pnl[3].item()
 
     def calcul_portfolio_value(self) -> Tensor:
-        return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value, self.device)
+        return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value)
 
     # Create a group state
     def new_state(self) -> tuple[Tensor, Tensor]:
@@ -104,7 +105,7 @@ class Env():
         return self.new_state()
 
     # The next step of env
-    def step(self, action:Tensor, entropy_b:Tensor|None=None):
+    def step(self, action:Tensor, entropy_b:Tensor|None) -> Any:
         state = self.new_state()
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None

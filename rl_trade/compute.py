@@ -47,8 +47,7 @@ def calcul_sharpe_ratio(portfolio_value: list) -> float:
         if np.isnan(sharpe) or np.isinf(sharpe):
             return 0.0
         return float(sharpe)
-    else:
-        return 0.0
+    return 0.0
 
 def max_dd(portfolio: deque[float], dd:bool=False) -> Tensor:
     values = torch.tensor(list(portfolio), dtype=torch.float32)
@@ -62,19 +61,19 @@ def max_dd(portfolio: deque[float], dd:bool=False) -> Tensor:
     mdd = torch.max(drawdowns)
     return mdd
 
-def calcul_cost(amount: Tensor, cost_rate: Tensor, device:str) -> Tensor: return amount * cost_rate
+def calcul_cost(amount: Tensor, cost_rate: Tensor) -> Tensor: return amount * cost_rate
 
 #def compute_entropy(prob: list[float]): return entropy(prob, base=2)
 
 def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
 
 def return_log_vec(data: list, device:str) -> Tensor:
-    data = torch.tensor(data, dtype=torch.float32, device=device)
-    p_return = torch.log(data[1:]/data[:-1])
+    data_ = torch.tensor(data, dtype=torch.float32, device=device)
+    p_return = torch.log(data_[1:]/data_[:-1])
     return p_return
 
 #Compute the return log
-def return_log(data: Tensor, device:str) -> Tensor: 
-    if data[1] > 1e-8 and data[0] > 1e-8: 
+def return_log(data: Tensor, device:str) -> Tensor:
+    if data[1] > 1e-8 and data[0] > 1e-8:
         return torch.log(data[1] / data[0])
     return torch.tensor(0.0, device=device)
