@@ -1,5 +1,5 @@
 from rl_trade.env import Env
-from agent.ppo import PPOTrainer, Writer
+from agent.ppo_belief import PPOTrainer, Writer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
@@ -32,7 +32,7 @@ TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
-env = Env(hour_df, macro_df, price_series, state_series)
+env = Env(hour_df, macro_df, price_series, state_series, use_scaler=True, device=DEVICE)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
@@ -47,8 +47,8 @@ micro_obs, macro_obs = env.reset()
 global_step = 0
 # Training Loop
 for update in tqdm(range(1, NUM_UPDATE + 1)):
-    cumulative_reward: float = 0.0
-    cumulative_pnl: float = 0.0
+    cumulative_reward = 0.0
+    cumulative_pnl = 0.0
     portfolio_value: deque[float] = deque()
     btc_value: deque[float] = deque()
     action_counts = {0: 0, 1: 0, 2: 0}
@@ -61,7 +61,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         with torch.inference_mode():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-        next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+        next_obs, reward, target_regime, truncate, done = env.step(action_t)
         action_counts[int(action_t)] += 1
         done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
         buffer.insert(

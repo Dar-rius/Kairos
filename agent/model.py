@@ -10,9 +10,13 @@ class MacroHead(nn.Module):
         super(MacroHead, self).__init__()
         self.macro_net = nn.Sequential(
             nn.Linear(macro_dim, 128),
+            nn.LayerNorm(128),     # Stabilise les signaux financiers
             nn.ReLU(),
+            nn.Dropout(0.3),         # Désactive 30% des neurones (Anti-Overfit)
             nn.Linear(128, 32),
+            nn.LayerNorm(32),      # Stabilise encore
             nn.ReLU(),
+            nn.Dropout(0.2)
         )
         self.belief_head = nn.Linear(32, num_regimes)
         self._init_weights()
@@ -96,3 +100,25 @@ class Agent(nn.Module):
         #belief_probs is the probability for belief
         #belief_entropy
         return action, log_prob, dist_entropy, value, belief_logits, belief_entropy
+
+# FocalLoss
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=None, gamma=2.0, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.reduction = reduction
+        # Alpha permet de garder les poids de classes si on le souhaite
+        self.alpha = alpha 
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
+        pt = torch.exp(-ce_loss) # Probabilité de la classe correcte
+        
+        # Application de l'équation de la Focal Loss
+        focal_loss = ((1 - pt) ** self.gamma) * ce_loss
+        
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        return focal_loss

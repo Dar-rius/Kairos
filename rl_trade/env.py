@@ -7,12 +7,34 @@ from torch import Tensor
 import gymnasium as gym
 from gymnasium import spaces
 from typing import Any
+from sklearn.preprocessing import StandardScaler
 
 # ******* ENV **********
 class Env():
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu'):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu', use_scaler:bool=False, macro_scaler_path:str=None):
         self.device = device
         self.init_usd_amount = amount_usd
+        self.use_scaler = use_scaler
+        if self.use_scaler:
+            # 1. Normalisation Micro (Ajusté sur le dataset courant)
+            self.micro_scaler = StandardScaler()
+            scaled_hour = self.micro_scaler.fit_transform(hour_trade.values)
+            
+            # 2. Normalisation Macro (Chargement du scaler pré-entraîné si fourni, sinon fit)
+            if macro_scaler_path is not None:
+                self.macro_scaler = joblib.load(macro_scaler_path)
+                scaled_macro = self.macro_scaler.transform(macro_trade.values)
+            else:
+                self.macro_scaler = StandardScaler()
+                scaled_macro = self.macro_scaler.fit_transform(macro_trade.values)
+                
+            # Chargement des tensors normalisés
+            self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
+            self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
+        else:
+            # Chargement des tensors bruts
+            self.hour_trade = torch.tensor(hour_trade.values, dtype=torch.float32, device=self.device)
+            self.macro_trade = torch.tensor(macro_trade.values, dtype=torch.float32, device=self.device)
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
         self.total_pnl = torch.zeros((4,1), dtype=torch.float32, device=self.device)
         self.btc_value = torch.tensor([0], dtype=torch.float32, device=self.device)
@@ -87,9 +109,11 @@ class Env():
 
     # Create a group state
     def new_state(self) -> tuple[Tensor, Tensor]:
+        macro_idx = min(self.time[0].item(), self.size - 1)
+        price_idx = min(self.time[2].item(), self.price.shape[0] - 1)
         daily_trades = self.hour_trade[self.time[1]:self.time[2]]
-        macro_days = self.macro_trade[self.time[0]]
-        self.btc_value = self.price[self.time[2]]
+        macro_days = self.macro_trade[macro_idx]
+        self.btc_value = self.price[price_idx]
         self._next()
         return (daily_trades, macro_days)
 
@@ -105,7 +129,7 @@ class Env():
         return self.new_state()
 
     # The next step of env
-    def step(self, action:Tensor, entropy_b:Tensor|None) -> Any:
+    def step(self, action:Tensor) -> Any:
         state = self.new_state()
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None

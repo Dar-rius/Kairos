@@ -18,7 +18,7 @@ macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 
 # Initialization
-env = Env(hour_df, macro_df, price_series, amount_usd=100000.0)
+env = Env(hour_df, macro_df, price_series, amount_usd=100000.0, use_scaler=True, device=DEVICE)
 TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
@@ -51,7 +51,7 @@ for _ in tqdm(range(TEST_STEPS)):
     macro_obs = macro_obs.unsqueeze(0)
     with torch.no_grad():
         action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
-    next_obs, _, _, _, done = env.step(action_t, entropy_b=None)
+    next_obs, _, _, _, done = env.step(action_t)
     current_val = env.calcul_portfolio_value()
     current_price = env.btc_value
     portfolio_history.append(current_val.item())
