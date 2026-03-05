@@ -6,40 +6,27 @@ import torch
 from torch import Tensor
 from collections import deque
 
-BETA = .25
+BETA = .2
 
-def reward_func(return_:Tensor, action:Tensor, ema_return:float, ema_sq_return:float, eta: float = 0.01) -> tuple:
-    action = torch.where(action == 2, -1, action.int())
-    fee_penalty = 0.001 if action != 0 else 0
-    net_return = return_.item() - fee_penalty
-
-    A_prev = ema_return
-    B_prev = ema_sq_return
-
-    variance:float = B_prev - (A_prev ** 2)
-    if variance < 1e-8:
-        variance = 1e-8
-
-    delta_A = net_return - A_prev
-    delta_B = (net_return ** 2) - B_prev
-
-    numerator = (B_prev * delta_A) - (0.5 * A_prev * delta_B)
-    denominator = math.pow(variance, 1.5)
-    dsr = numerator / denominator
-
-    ema_return = A_prev + eta * delta_A
-    ema_sq_return = B_prev + eta * delta_B
-
-    reward = np.clip(dsr, -1.0, 1.0)
-    return (reward.item(), ema_return, ema_sq_return)
+def reward_func(return_:Tensor, entropy_b:Tensor|None=None) -> float:
+    if torch.isnan(return_).any() or torch.isinf(return_).any(): return -1.0
+    if entropy_b is None: return 0.0
+    # Compute the macro strategy for detect the state of market
+    macro_strat = BETA *  entropy_b
+    final_reward = torch.clamp((return_ * 100) - macro_strat, -1.0, 1.0)
+    if torch.isnan(final_reward).any(): return -1.0
+    return final_reward.item()
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
     if len(portfolio_value) < 2: return 0.0
     val_arr = np.array(portfolio_value, dtype=np.float64)
-    
-    returns = np.diff(val_arr) / (val_arr[:-1] + 1e-9)
-    returns = np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
+    if not np.isfinite(val_arr).all():
+        return 0.0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        returns = np.diff(val_arr) / (val_arr[:-1] + 1e-9)
+        
+        returns = np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
     
     std_dev = np.std(returns)
     if std_dev > 1e-8:
@@ -52,6 +39,7 @@ def calcul_sharpe_ratio(portfolio_value: list) -> float:
 def max_dd(portfolio: deque[float], dd:bool=False) -> Tensor:
     values = torch.tensor(list(portfolio), dtype=torch.float32)
     if values.shape[0] < 2: return torch.tensor(0.0)
+    if not torch.isfinite(values).all(): return torch.tensor(1.0)
     if dd:
         peak = torch.max(values)
         drawdowns = (peak - values[-1]) / (peak + 1e-9)  

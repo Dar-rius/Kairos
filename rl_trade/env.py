@@ -51,8 +51,6 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.ema_return = 0.0
-        self.ema_sq_return = 0.0
 
     def _update_p_values(self) -> None:
         self.p_values_return[0] = self.p_values_return[1]
@@ -91,8 +89,6 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
-        self.ema_return = 0.0
-        self.ema_sq_return = 0.0
 
     def _next(self) -> None:
         self.time[1] += 1
@@ -129,7 +125,7 @@ class Env():
         return self.new_state()
 
     # The next step of env
-    def step(self, action:Tensor) -> Any:
+    def step(self, action:Tensor, entropy_b:Tensor|None=None) -> Any:
         state = self.new_state()
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
@@ -144,5 +140,5 @@ class Env():
         truncate = True if self.calcul_portfolio_value() == 0 else False
         truncate_t = torch.tensor(truncate, device=self.device)
         #Compute the reward
-        reward, self.ema_return, self.ema_sq_return = reward_func(return_, action, self.ema_return, self.ema_sq_return)
+        reward = reward_func(return_, entropy_b)
         return state, reward, state_pred, truncate_t, done_t

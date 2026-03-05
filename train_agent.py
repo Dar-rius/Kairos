@@ -14,13 +14,13 @@ DATA_PATH = './data_off/train_test/'
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
-LR = 3e-4
-GAMMA = 0.99
+LR = 3e-5
+GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.01
-VALUE_COEF = 0.5
-BELIEF_COEF = 0.3
+ENT_COEF = 0.02
+VALUE_COEF = 0.3
+BELIEF_COEF = 0.2
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -61,7 +61,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
         with torch.inference_mode():
             action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-        next_obs, reward, target_regime, truncate, done = env.step(action_t)
+        next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
         action_counts[int(action_t)] += 1
         done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
         buffer.insert(

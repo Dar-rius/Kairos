@@ -1,5 +1,5 @@
 from rl_trade.env import Env
-from agent.ppo import PPOTrainer
+from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
@@ -31,7 +31,7 @@ def objective(trial):
     
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
-    env = Env(hour_df, macro_df, price_series, state_series)
+    env = Env(hour_df, macro_df, price_series, state_series, use_scaler=True, device=DEVICE)
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
@@ -58,7 +58,7 @@ def objective(trial):
             with torch.inference_mode():
                 action_t, log_prob_t, _, value_t, _, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+            next_obs, reward, target_regime, truncate, done = env.step(action_t)
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
