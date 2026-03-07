@@ -98,7 +98,10 @@ class Env():
             self.time[0] += 1
             self.seq = torch.tensor([0])
 
-    def get_pnl(self) -> float: return self.total_pnl[3].item()
+    def get_pnl(self) -> float: 
+        pnl = self.total_pnl[3]
+        if torch.isinf(pnl).any(): return 0.0
+        return pnl.item()
 
     def calcul_portfolio_value(self) -> Tensor:
         return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value)
