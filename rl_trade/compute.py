@@ -12,9 +12,8 @@ def reward_func(return_:Tensor, entropy_b:Tensor|None=None) -> float:
     if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
     return_step = return_ * 100
     if entropy_b is None: return torch.clamp(return_step, -10.0, 10.0).item()
-    excess_entropy = torch.clamp(entropy_b - 0.6, min=0.0)
     # Compute the macro strategy for detect the state of market
-    macro_strat = BETA * excess_entropy * torch.abs(return_step)
+    macro_strat = BETA * entropy_b * torch.abs(return_step)
     final_reward = torch.clamp(return_step - macro_strat, -10.0, 10.0)
     if torch.isnan(final_reward).any(): return -10.0
     return final_reward.item()

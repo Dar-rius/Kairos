@@ -14,7 +14,7 @@ DATA_PATH = './data_off/train_test/'
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
-LR = 3e-5
+LR = 3e-4
 GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
@@ -43,7 +43,7 @@ buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
 
 # Run env
-micro_obs, macro_obs = env.reset()
+micro_obs, macro_obs = env.reset(train=False)
 global_step = 0
 # Training Loop
 for update in tqdm(range(1, NUM_UPDATE + 1)):
