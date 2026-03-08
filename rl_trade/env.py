@@ -11,28 +11,19 @@ from sklearn.preprocessing import StandardScaler
 
 # ******* ENV **********
 class Env():
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu', use_scaler:bool=False, macro_scaler_path:str=None):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu', use_scaler:bool=False):
         self.device = device
         self.init_usd_amount = amount_usd
         self.use_scaler = use_scaler
         if self.use_scaler:
-            # 1. Normalisation Micro (Ajusté sur le dataset courant)
+            # Normalized all dataset
             self.micro_scaler = StandardScaler()
+            self.macro_scaler = StandardScaler()
             scaled_hour = self.micro_scaler.fit_transform(hour_trade.values)
-            
-            # 2. Normalisation Macro (Chargement du scaler pré-entraîné si fourni, sinon fit)
-            if macro_scaler_path is not None:
-                self.macro_scaler = joblib.load(macro_scaler_path)
-                scaled_macro = self.macro_scaler.transform(macro_trade.values)
-            else:
-                self.macro_scaler = StandardScaler()
-                scaled_macro = self.macro_scaler.fit_transform(macro_trade.values)
-                
-            # Chargement des tensors normalisés
+            scaled_macro = self.macro_scaler.transform(macro_trade.values)
             self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
         else:
-            # Chargement des tensors bruts
             self.hour_trade = torch.tensor(hour_trade.values, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(macro_trade.values, dtype=torch.float32, device=self.device)
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
