@@ -11,7 +11,11 @@ from sklearn.preprocessing import StandardScaler
 
 # ******* ENV **********
 class Env():
-    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame, price:pd.Series, state_pred:pd.Series=None, amount_usd:float=100000.0, cost_rate:float=0.001, device:str='cpu', use_scaler:bool=False):
+    def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame,
+                 price:pd.Series, state_pred:pd.Series=None,
+                 amount_usd:float=100000.0, cost_rate:float=0.001,
+                 device:str='cpu', use_scaler:bool=False
+                 ):
         self.device = device
         self.init_usd_amount = amount_usd
         self.use_scaler = use_scaler
@@ -91,7 +95,7 @@ class Env():
 
     def get_pnl(self) -> float: 
         pnl = self.total_pnl[3]
-        if torch.isinf(pnl).any(): return 0.0
+        if torch.isnan(pnl).any() or torch.isinf(pnl).any(): return 0.0
         return pnl.item()
 
     def calcul_portfolio_value(self) -> Tensor:
@@ -99,14 +103,15 @@ class Env():
 
     # Create a group state
     def new_state(self) -> tuple[Tensor, Tensor]:
-        macro_idx = min(self.time[0].item(), self.size - 1)
-        price_idx = min(self.time[2].item(), self.price.shape[0] - 1)
+        macro_idx = int(min(self.time[0].item(), self.size - 1))
+        price_idx = int(min(self.time[2].item(), self.price.shape[0] - 1))
         daily_trades = self.hour_trade[self.time[1]:self.time[2]]
         macro_days = self.macro_trade[macro_idx]
         self.btc_value = self.price[price_idx]
         self._next()
         return (daily_trades, macro_days)
 
+    # mask actions
     def get_action_mask(self) -> Tensor:
         mask = [True, True, True]
         if self.total_amount[1] < 1.0: mask[2] = False
@@ -129,9 +134,9 @@ class Env():
         elif action == 1: self._buy()
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
-        done = True if self.time[2] == self.hour_trade.shape[0] else False
+        done = self.time[2] == self.hour_trade.shape[0]
         done_t = torch.tensor(done, device=self.device)
-        truncate = True if self.calcul_portfolio_value() == 0 else False
+        truncate = self.calcul_portfolio_value() == 0
         truncate_t = torch.tensor(truncate, device=self.device)
         #Compute the reward
         reward = reward_func(return_, entropy_b)
