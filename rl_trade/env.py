@@ -47,11 +47,11 @@ class Env():
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
 
-    def _update_p_values(self) -> None:
+    def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
         self.p_values_return[1] = self.calcul_portfolio_value()
 
-    def _buy(self) -> None:
+    def _buy(self):
         cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
         usd_price = self.total_amount[0] - cost_fees
         self.total_amount[1] = convert_to_btc(usd_price, self.btc_value)
@@ -59,7 +59,7 @@ class Env():
         self.total_pnl[2] = cost_fees
         self.total_amount[0] = 0
 
-    def _sell(self) -> None:
+    def _sell(self):
         usd_price = convert_to_usd(self.total_amount[1], self.btc_value)
         cost_fees = calcul_cost(usd_price, self.cost_rate)
         self.total_amount[0] = usd_price - cost_fees
@@ -68,7 +68,7 @@ class Env():
         self.total_pnl[3] = profit_and_loss(self.total_pnl)
         self.total_amount[1] = 0
 
-    def _all_reset(self, train:bool=True) -> None:
+    def _all_reset(self, train:bool=True):
         if train:
             min_steps_left = 500
             max_macro_idx = self.size - (min_steps_left // 24) - 1
@@ -85,7 +85,7 @@ class Env():
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
 
-    def _next(self) -> None:
+    def _next(self):
         self.time[1] += 1
         self.time[2] += 1
         self.seq += 1
