@@ -1,3 +1,5 @@
+from collections import deque
+import os
 from rl_trade.env import Env
 from agent.ppo_belief import PPOTrainer, Writer
 from agent.buffer import Buffer
@@ -7,8 +9,7 @@ import torch
 import numpy as np
 import pandas as pd
 from rl_trade.compute import calcul_sharpe_ratio, max_dd
-from collections import deque
-import os
+
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 DATA_PATH = './data_off/train_test/'

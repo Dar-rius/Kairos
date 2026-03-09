@@ -1,3 +1,6 @@
+from collections import deque
+import os
+import datetime
 import torch
 import pandas as pd
 import numpy as np
@@ -6,9 +9,7 @@ from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from rl_trade.compute import calcul_sharpe_ratio,max_dd
-from collections import deque
-import os
-import datetime
+
 
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"

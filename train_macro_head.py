@@ -1,3 +1,5 @@
+import os
+import datetime
 import torch
 import torch.optim as optim
 import pandas as pd
@@ -13,7 +15,6 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, cla
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
 from collections import deque
-import os
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
@@ -103,7 +104,9 @@ plt.xlabel('Predictions')
 plt.ylabel('Reality')
 plt.title('Confusion Matrix - Validation Walk-Forward')
 if not os.path.exists(MAT_CONF_PATH): os.makedirs(MAT_CONF_PATH)
-plt.savefig(f"{MAT_CONF_PATH}/confusion_matrix.png")
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+plt.savefig(f"{MAT_CONF_PATH}/confusion_matrix_{timestamp}.png")
+print(f"Confusion Matrix saved: {MAT_CONF_PATH}/confusion_matrix_{timestamp}.png")
 
 #Train the finale model and saved it
 scaler = StandardScaler()
@@ -124,4 +127,4 @@ for epoch in range(EPOCHS):
 
 if not os.path.exists(MAT_CONF_PATH): os.makedirs(MODEL_PATH)
 torch.save(final_macro_head.state_dict(), f'{MAT_CONF_PATH}/belief_head.pt')
-print("Model saved")
+print(f"Model saved: {MAT_CONF_PATH}/belief_head.pt")
