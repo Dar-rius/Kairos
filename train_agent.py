@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 from rl_trade.compute import calcul_sharpe_ratio, max_dd
 from collections import deque
+import os
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 DATA_PATH = './data_off/train_test/'
+MODEL_PATH = "./agent/save"
 print(f"Training on: {DEVICE}")
 
 # Agent Hyperparam
@@ -106,6 +108,7 @@ for update in tqdm(range(1, NUM_UPDATE + 1)):
     writer.add(global_step, loss, policy_loss, value_loss, belief_loss, entropy, cumulative_reward, cumulative_pnl, sharpe, mdd, hold_pct, buy_pct, sell_pct)
 
 #Save model
+if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')
 torch.save(belief_model.state_dict(), './agent/save/belief_head_1.pt')
 writer.close()

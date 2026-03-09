@@ -13,10 +13,13 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, cla
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
 from collections import deque
+import os
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
 train_target_set = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
+MAT_CONF_PATH = "./runs/train_macro"
+MODEL_PATH = "./agent/save"
 LR = 0.0008
 EPOCHS = 30
 BATCH_SIZE = 64
@@ -99,7 +102,8 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
 plt.xlabel('Predictions')
 plt.ylabel('Reality')
 plt.title('Confusion Matrix - Validation Walk-Forward')
-plt.savefig('./train_macro/confusion_matrix.png')
+if not os.path.exists(MAT_CONF_PATH): os.makedirs(MAT_CONF_PATH)
+plt.savefig(f"{MAT_CONF_PATH}/confusion_matrix.png")
 
 #Train the finale model and saved it
 scaler = StandardScaler()
@@ -118,5 +122,6 @@ for epoch in range(EPOCHS):
         loss.backward()
         optimizer.step()
 
-torch.save(final_macro_head.state_dict(), './agent/save/belief_head.pt')
+if not os.path.exists(MAT_CONF_PATH): os.makedirs(MODEL_PATH)
+torch.save(final_macro_head.state_dict(), f'{MAT_CONF_PATH}/belief_head.pt')
 print("Model saved")

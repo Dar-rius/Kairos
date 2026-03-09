@@ -7,12 +7,15 @@ from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from rl_trade.compute import calcul_sharpe_ratio,max_dd
 from collections import deque
+import os
+import datetime
 
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 AGENT_PATH = './agent/save/agent_saved.pt'
 BELIEF_PATH = './agent/save/belief_head_1.pt'
 DATA_PATH = './data_off/train_test/'
+GRAPH_PATH = "./runs/test"
 # DataFrame 
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
@@ -99,4 +102,8 @@ plt.title('Porfolio Evolution')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('runs/test/backtest_result.png')
+
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+if not os.path.exists(GRAPH_PATH): os.makedirs(GRAPH_PATH)
+plt.savefig(f'{GRAPH_PATH}/backtest_result_{timestamp}.png')
+print(f"Save img: {GRAPH_PATH}/backtest_result_{timestamp}.png")
