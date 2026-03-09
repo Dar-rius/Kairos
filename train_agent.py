@@ -43,7 +43,7 @@ buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 writer = Writer("./runs/train/")
 
 # Run env
-micro_obs, macro_obs = env.reset(train=False)
+micro_obs, macro_obs = env.reset()
 global_step = 0
 # Training Loop
 for update in tqdm(range(1, NUM_UPDATE + 1)):

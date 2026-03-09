@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import optuna
 from rl_trade.compute import calcul_sharpe_ratio
+from collections import deque
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
@@ -15,9 +16,9 @@ DATA_PATH = './data_off/train_test/'
 
 def objective(trial):
 # Agent Hyperparam
-    lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-    gamma = trial.suggest_float("gamma", 0.95, 0.99)
-    gae_lambda = trial.suggest_float("gae_lambda", 0.95, 0.99)
+    lr = trial.suggest_float("lr", 1e-6, 1e-3, log=True)
+    gamma = trial.suggest_float("gamma", 0.90, 0.99)
+    gae_lambda = trial.suggest_float("gae_lambda", 0.90, 0.99)
     ent_coef = trial.suggest_float("ent_coef", 0.001, 0.1, log=True)
     value_coef = trial.suggest_float("value_coef", 0.005, 0.5, log=True)
     belief_coef = trial.suggest_float("belief_coef", 0.005, 0.5, log=True)
@@ -31,6 +32,7 @@ def objective(trial):
     
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
+
     env = Env(hour_df, macro_df, price_series, state_series, use_scaler=True, device=DEVICE)
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
@@ -41,14 +43,14 @@ def objective(trial):
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
-    sharpes: list[float] = []
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
     for epoch in range(1, 100 + 1):
         cumulative_reward = 0.0
-        btc_value: list[float] = []
-        portfolio_value: list[float] = []
+        rewards_: deque[float] = deque()
+        #btc_value: deque[float] = deque()
+        #portfolio_value: deque[float] = deque()
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
             global_step += 1
@@ -70,8 +72,7 @@ def objective(trial):
                 target_regime=target_regime
             )
             cumulative_reward += reward
-            btc_value.append(env.btc_value.item())
-            portfolio_value.append(env.calcul_portfolio_value().item())
+            rewards_.append(rewards_)
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
             else:
@@ -94,18 +95,11 @@ def objective(trial):
         # Clean buffer
         buffer.clear()
 
-        returns_s = pd.Series(portfolio_value).pct_change().dropna()
-        if len(returns_s) > 1 and returns_s.std() > 1e-8:
-            sharpe_epoch = (returns_s.mean() / returns_s.std()) * np.sqrt(365 * 24)
-        else:
-            sharpe_epoch = 0.0
-
-        sharpes.append(sharpe_epoch)
         # For optuna
-        trial.report(sharpe_epoch, epoch)
+        trial.report(cumulative_reward, epoch)
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
-    return np.mean(sharpes[-10:]) if len(sharpes) > 10 else np.mean(sharpes)
+    return  np.mean(rewards_)
 
 study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",

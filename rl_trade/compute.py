@@ -33,18 +33,18 @@ def calcul_sharpe_ratio(portfolio_value: list) -> float:
         return float(sharpe)
     return 0.0
 
-def max_dd(portfolio: deque[float], dd:bool=False) -> Tensor:
+def max_dd(portfolio: deque[float], dd:bool=False) -> float:
     values = torch.tensor(list(portfolio), dtype=torch.float32)
-    if values.shape[0] < 2: return torch.tensor(0.0)
-    if not torch.isfinite(values).all(): return torch.tensor(1.0)
+    if values.shape[0] < 2: return 0.0
+    if not torch.isfinite(values).all(): return 1.0
     if dd:
         peak = torch.max(values)
-        drawdowns = (peak - values[-1]) / (peak + 1e-9)  
-        return drawdowns
+        drawdowns = (peak - values[-1]) / (peak + 1e-9)
+        return drawdowns.item()
     peak = torch.cummax(values, dim=0).values
     drawdowns = (peak - values) / (peak + 1e-9)
     mdd = torch.max(drawdowns)
-    return mdd
+    return mdd.item()
 
 def calcul_cost(amount: Tensor, cost_rate: Tensor) -> Tensor: return amount * cost_rate
 

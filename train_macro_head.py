@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
+from collections import deque
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
@@ -20,8 +21,8 @@ LR = 0.0008
 EPOCHS = 30
 BATCH_SIZE = 64
 MACRO_DIM = train_feature_set.shape[1]
-all_y_true = []
-all_y_pred = []
+all_y_true : deque[int] = deque()
+all_y_pred : deque[int] = deque()
 class_names = ['Stable (0)', 'Volatile (1)', 'Crisis (2)']
 tscv = TimeSeriesSplit(n_splits=10)
 
@@ -70,7 +71,6 @@ for train_index, val_index in tscv.split(X):
             loss = criterion(logits, batch_y)
             loss.backward()
             optimizer.step()
-    
     model.eval()
     with torch.no_grad():
         _, val_logits = model(X_val_tensor)

@@ -6,6 +6,7 @@ from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from rl_trade.compute import calcul_sharpe_ratio,max_dd
+from collections import deque
 
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -34,15 +35,15 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
 
 print("Run the Backtest...")
-micro_obs, macro_obs = env.reset(train=True)
+micro_obs, macro_obs = env.reset(train=False)
 
 # Tracking
-portfolio_history = []
-price_history = []
-actions_history = []
-pnl_history = []
-sharpes = []
-mdd = []
+portfolio_history : deque[float] = deque()
+price_history : deque[float] = deque()
+actions_history : deque[int] = deque()
+pnl_history : deque[float] = deque()
+sharpes : deque[float] = deque()
+mdd : deque[float] = deque()
 done = False
 
 for _ in tqdm(range(TEST_STEPS)):
@@ -52,23 +53,24 @@ for _ in tqdm(range(TEST_STEPS)):
     with torch.no_grad():
         action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
     next_obs, _, _, _, done = env.step(action_t)
-    current_val = env.calcul_portfolio_value()
-    current_price = env.btc_value
-    portfolio_history.append(current_val.item())
+    current_val: float = env.calcul_portfolio_value().item()
+    current_price = env.btc_value.item()
+    portfolio_history.append(current_val)
     copy_portfolio = portfolio_history.copy()
-    price_history.append(current_price.item())
+    price_history.append(current_price)
     actions_history.append(action_t.item())
     pnl_history.append(env.get_pnl())
     n_days += 1
-    if n_days == 365 or n_days == TEST_STEPS:
+    if n_days % 365 == 0 or n_days == TEST_STEPS:
         portfolio_s = pd.Series(copy_portfolio)
         returns = portfolio_s.pct_change().dropna()
-        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24) 
-        sharpes.append(sharpe.item()) 
-        mdd.append(max_dd(portfolio_history).item())
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24)
+        sharpes.append(sharpe.item())
+        mdd.append(max_dd(portfolio_history))
         copy_portfolio.clear()
     if done: break
     micro_obs, macro_obs = next_obs
+
 results_df = pd.DataFrame({
     'portfolio_value': portfolio_history,
     'btc_value': price_history,

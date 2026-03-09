@@ -24,7 +24,7 @@ class Env():
             self.micro_scaler = StandardScaler()
             self.macro_scaler = StandardScaler()
             scaled_hour = self.micro_scaler.fit_transform(hour_trade.values)
-            scaled_macro = self.macro_scaler.transform(macro_trade.values)
+            scaled_macro = self.macro_scaler.fit_transform(macro_trade.values)
             self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
         else:
@@ -135,9 +135,7 @@ class Env():
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
         done = self.time[2] == self.hour_trade.shape[0]
-        done_t = torch.tensor(done, device=self.device)
         truncate = self.calcul_portfolio_value() == 0
-        truncate_t = torch.tensor(truncate, device=self.device)
         #Compute the reward
         reward = reward_func(return_, entropy_b)
-        return state, reward, state_pred, truncate_t, done_t
+        return state, reward, state_pred, truncate, done
