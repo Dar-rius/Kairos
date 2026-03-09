@@ -1,6 +1,6 @@
 from collections import deque
 import os
-from rl_trade.env import Env
+from kairos.env import Env
 from agent.ppo_belief import PPOTrainer, Writer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
@@ -8,7 +8,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import pandas as pd
-from rl_trade.compute import calcul_sharpe_ratio, max_dd
+from kairos.compute import calcul_sharpe_ratio, max_dd
 
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"

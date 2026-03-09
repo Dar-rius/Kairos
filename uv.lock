@@ -8,6 +8,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "rl-trade"
+name = "kairos"
 version = "0.1.0"
 source = { editable = "." }

@@ -1,4 +1,4 @@
-from rl_trade.env import Env
+from kairos.env import Env
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import pandas as pd
 import optuna
-from rl_trade.compute import calcul_sharpe_ratio
+from kairos.compute import calcul_sharpe_ratio
 from collections import deque
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"

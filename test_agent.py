@@ -5,10 +5,10 @@ import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from rl_trade.env import Env
+from kairos.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from rl_trade.compute import calcul_sharpe_ratio,max_dd
+from kairos.compute import calcul_sharpe_ratio,max_dd
 
 
 # Config

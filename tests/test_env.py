@@ -1,5 +1,5 @@
 import pandas as pd 
-from rl_trade.env import Env 
+from kairos.env import Env 
 from pandas.testing import assert_frame_equal
 import numpy as np
 import torch
