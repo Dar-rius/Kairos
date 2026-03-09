@@ -25,6 +25,7 @@ class Writer:
         self.writer.add_scalar("Hold", hold_pct, step)
         self.writer.add_scalar("Buy", buy_pct, step)
         self.writer.add_scalar("Sell", sell_pct, step)
+
     def close(self): self.writer.close()
 
 # Belief PPO Implementation

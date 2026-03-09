@@ -85,7 +85,7 @@ class Agent(nn.Module):
         value = self.critic(context)
         return action_logits, value, belief_logits
 
-    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int=None, mask_action:Tensor=None):
+    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int|None=None, mask_action:Tensor=None):
         actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
         if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
