@@ -8,3 +8,4 @@
 db.sqlite3
 *.lock
 /train_macro/
+/wandb

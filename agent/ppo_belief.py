@@ -5,28 +5,6 @@ import numpy as np
 from torch import Tensor
 from .buffer import Buffer
 from .model import Agent
-from torch.utils.tensorboard import SummaryWriter
-
-# Class for TensorBoard
-class Writer:
-    def __init__(self, path:str):
-        self.writer = SummaryWriter(log_dir=path)
-
-    def add(self, step, policy_loss:float, critic_loss:float, entropy_loss:float, belief_loss:float, loss:float, reward:float, pnl:float, sharpe:float, mdd:float, hold_pct:float, buy_pct:float, sell_pct:float):
-        self.writer.add_scalar("Policy Loss", policy_loss, step)
-        self.writer.add_scalar("Critic Loss", critic_loss, step)
-        self.writer.add_scalar("Belief Loss", belief_loss, step)
-        self.writer.add_scalar("Entropy Loss", entropy_loss, step)
-        self.writer.add_scalar("Loss", loss, step)
-        self.writer.add_scalar("Reward", reward, step)
-        self.writer.add_scalar("PNL", pnl, step)
-        self.writer.add_scalar("Sharpe ratio", sharpe, step)
-        self.writer.add_scalar("Max Draw Down", mdd, step)
-        self.writer.add_scalar("Hold", hold_pct, step)
-        self.writer.add_scalar("Buy", buy_pct, step)
-        self.writer.add_scalar("Sell", sell_pct, step)
-
-    def close(self): self.writer.close()
 
 # Belief PPO Implementation
 class PPOTrainer:
