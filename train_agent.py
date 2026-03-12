@@ -17,7 +17,6 @@ import wandb
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
-PROJECT = 'Kairos'
 print(f"Training on: {DEVICE}")
 wandb.login()
 
