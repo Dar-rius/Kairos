@@ -131,7 +131,9 @@ class Env():
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
         # Sell
-        if action == 2: self._sell()
+        if action == 2:
+            action = torch.tensor([-1], device=self.device)
+            self._sell()
         # Buy
         elif action == 1: self._buy()
         self._update_p_values()

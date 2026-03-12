@@ -8,13 +8,10 @@ from collections import deque
 
 def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor) -> float:
     if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
-    gain = 0.0
-    if action == 1:
-        gain = return_.item()
-    elif action == 2:
-        gain = -return_
-    cost = fees * torch.abs(action - prev_action)
-    final_reward = gain - cost
+    gain = (action * return_) * 100
+    cost = fees * 100 * torch.abs(action - prev_action)
+    reward = gain - cost
+    final_reward = torch.clamp(reward, -10.0, 10.0)
     return final_reward.item()
 
 #Compute the sharpe ration
