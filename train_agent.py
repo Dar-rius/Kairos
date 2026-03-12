@@ -6,6 +6,8 @@ from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 import torch
+import torch.nn.functional as F
+from torch import Tensor
 import numpy as np
 import pandas as pd
 from kairos.compute import calcul_sharpe_ratio, max_dd
@@ -34,7 +36,7 @@ macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
-TOTAL_TIMESTAMP = 5000000
+TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -43,6 +45,7 @@ ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
 belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
+belief_model.eval()
 agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
 trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF, device=DEVICE)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
@@ -56,7 +59,7 @@ config = {
         'gae_lambda': GAE_LAMBDA,
         'clip_eps': CLIP_EPS,
         'value_coef': VALUE_COEF,
-        'belief_coef': BELIEF_COEF
+        #'belief_coef': BELIEF_COEF
         }
 
 # Run env
@@ -76,12 +79,18 @@ with wandb.init(project=project, config=config) as run:
             micro_t = micro_obs.unsqueeze(0)
             macro_t = macro_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
+            target_regime: Tensor|None = None
+            belief_entropy = None
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                if target_regime is not None:
+                    belief_entropy = F.cross_entropy(belief_logits, target_regime.flatten())
+                    print(belief_entropy)
 
-            next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+            next_obs, reward, target, truncate, done = env.step(action_t, belief_entropy)
             action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
+            target_regime = target
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
@@ -90,7 +99,6 @@ with wandb.init(project=project, config=config) as run:
                 reward=reward,
                 value=value_t,
                 dones = done_casted,
-                target_regime=target_regime
             )
             cumulative_reward += reward
             cumulative_pnl += env.get_pnl()
@@ -104,7 +112,7 @@ with wandb.init(project=project, config=config) as run:
         with torch.inference_mode():
             next_micro_t = micro_obs.unsqueeze(0)
             next_macro_t = macro_obs.unsqueeze(0)
-            _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
+            _, _, _, next_value, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
             last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
@@ -117,14 +125,14 @@ with wandb.init(project=project, config=config) as run:
         dones_list = buffer.dones
         returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
-        #Compute Belief PPO
-        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        #Compute  PPO
+        loss, policy_loss, value_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,
                  'policy loss': policy_loss,
                  'value loss': value_loss,
-                 'belief loss': belief_loss,
+                 #'belief loss': belief_loss,
                  'entropy': entropy,
                  'reward': cumulative_reward,
                  'pnl': cumulative_pnl,

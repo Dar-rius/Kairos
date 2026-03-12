@@ -26,9 +26,9 @@ class MacroHead(nn.Module):
             if isinstance(layer, nn.Linear):
                 nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
                 nn.init.constant_(layer.bias, 0.0)
-
         nn.init.orthogonal_(self.belief_head.weight, gain=1.0)
         nn.init.constant_(self.belief_head.bias, 0.0)
+        
 
     def forward(self, macro_x:Tensor):
         x = self.macro_net(macro_x)
@@ -70,10 +70,16 @@ class Agent(nn.Module):
         actor_out = self.actor_layer[-1]
         nn.init.orthogonal_(actor_out.weight, gain=0.01)
         nn.init.constant_(actor_out.bias, 0.0)
+        #init critic head
+        nn.init.orthogonal_(self.critic.weight, gain=1.0)
+        nn.init.constant_(self.critic.bias, 0.0)
 
     def forward(self, micro_x:Tensor, macro_x:Tensor):
         # System 2
-        macro_feat, belief_logits = self.belief_head(macro_x)
+        with torch.no_grad():
+            macro_feat, belief_logits = self.belief_head(macro_x)
+        macro_feat = macro_feat.detach()
+        belief_logits = belief_logits.detach()
         current_belief_probs = torch.softmax(belief_logits, dim=1)
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()
@@ -92,14 +98,13 @@ class Agent(nn.Module):
         if action is None: action = probs.sample()
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
-        belief_probs = F.softmax(belief_logits, dim=1)
-        belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=1)
+        #belief_probs = F.softmax(belief_logits, dim=1)
         #log_prob is the probability action
         #dist_entropy is the entropy Bonus
         #value is the value for critic
         #belief_probs is the probability for belief
         #belief_entropy
-        return action, log_prob, dist_entropy, value, belief_logits, belief_entropy
+        return action, log_prob, dist_entropy, value, belief_logits
 
 # FocalLoss
 class FocalLoss(nn.Module):
@@ -108,15 +113,13 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.reduction = reduction
         # Alpha permet de garder les poids de classes si on le souhaite
-        self.alpha = alpha 
+        self.alpha = alpha
 
     def forward(self, inputs, targets):
         ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
         pt = torch.exp(-ce_loss) # Probabilité de la classe correcte
-        
         # Application de l'équation de la Focal Loss
         focal_loss = ((1 - pt) ** self.gamma) * ce_loss
-        
         if self.reduction == 'mean':
             return focal_loss.mean()
         elif self.reduction == 'sum':
