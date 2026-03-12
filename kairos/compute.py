@@ -11,7 +11,7 @@ def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor)
     gain = 0.0
     if action == 1:
         gain = return_.item()
-    elif action == -1:
+    elif action == 2:
         gain = -return_
     cost = fees * torch.abs(action - prev_action)
     final_reward = gain - cost
