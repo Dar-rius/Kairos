@@ -33,7 +33,7 @@ tscv = TimeSeriesSplit(n_splits=10)
 df_full = pd.merge(train_feature_set, train_target_set, left_index=True, right_index=True)
 df_full["regime"] = df_full["regime"].shift(-1)
 df_final = df_full.dropna()
-feature_cols = ['mvrv_z_score','mom_24h','mom_168h','mom_168h_z','hashRate_change','log_return','drawdown_micro', 'volatility',  'vol_park', 'RSI_7','RSI_14', 'mvrv_momentum', 'nvt_momentum', 'rsi_slop', 'mvrv_lag1', 'mvrv_lag3', 'vol_lag1', 'vol_lag3', 'vol_diff', 'mvrv_diff', 'hashRate_ma7']
+feature_cols = ['mvrv_z_score','mom_24h','mom_168h','mom_168h_z','hashRate_change','log_return','drawdown_micro', 'vol_garch',  'vol_parkinson', 'RSI_7','RSI_14', 'mvrv_momentum', 'nvt_momentum', 'rsi_slop', 'mvrv_lag1', 'mvrv_lag3', 'vol_lag1', 'vol_lag3', 'vol_diff', 'mvrv_diff', 'hashRate_ma7']
 X = df_final[feature_cols].values.astype(np.float32)
 y = df_final['regime'].values.astype(np.int64)
 fold = 0
