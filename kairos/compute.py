@@ -6,16 +6,15 @@ import torch
 from torch import Tensor
 from collections import deque
 
-BETA = .2
-
-def reward_func(return_:Tensor, entropy_b:Tensor|None=None) -> float:
+def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor) -> float:
     if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
-    return_step = return_ * 100
-    if entropy_b is None: return torch.clamp(return_step, -10.0, 10.0).item()
-    # Compute the macro strategy for detect the state of market
-    macro_strat = BETA * entropy_b * torch.abs(return_step)
-    final_reward = torch.clamp(return_step - macro_strat, -10.0, 10.0)
-    if torch.isnan(final_reward).any(): return -10.0
+    gain = 0.0
+    if action == 1:
+        gain = return_.item()
+    elif action == -1:
+        gain = -return_
+    cost = fees * torch.abs(action - prev_action)
+    final_reward = gain - cost
     return final_reward.item()
 
 #Compute the sharpe ration

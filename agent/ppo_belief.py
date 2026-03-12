@@ -47,7 +47,7 @@ class PPOTrainer:
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
         self.lr_decay(self.lr, total_steps, step)
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _ = memory.get_all()
+        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _, target_regimes = memory.get_all()
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
@@ -58,7 +58,7 @@ class PPOTrainer:
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, belief_entropy = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)
@@ -70,15 +70,16 @@ class PPOTrainer:
                 # Loss Value (Critic) - MSE
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx].flatten())
                 # Loss Belief (Auxiliary) - Cross Entropy
-                #belief_loss = self.ce_loss(belief_logits, target_regimes[idx].flatten().long())
+                belief_loss = self.ce_loss(belief_logits, target_regimes[idx].flatten().long())
                 entropy_loss = dist_entropy.mean()
                 # Total Loss
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
+                       (self.belief_coef * belief_loss) - \
                        (self.ent_coef * entropy_loss)
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
-        return loss.item(), policy_loss.item(), value_loss.item(), dist_entropy.mean().item()
+        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.mean().item()
