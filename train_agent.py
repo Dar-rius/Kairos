@@ -34,7 +34,7 @@ macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
-TOTAL_TIMESTAMP = 5000000
+TOTAL_TIMESTAMP = 3000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -70,6 +70,7 @@ with wandb.init(project=project, config=config) as run:
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
         action_counts = {0: 0, 1: 0, 2: 0}
+        last_done = False
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
             global_step += 1
@@ -79,7 +80,7 @@ with wandb.init(project=project, config=config) as run:
             with torch.inference_mode():
                 action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            next_obs, reward, target_regime, truncate, done = env.step(action_t, belief_entropy)
+            next_obs, reward, target_regime, truncate, done = env.step(action_t)
             action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
             buffer.insert(
@@ -98,14 +99,18 @@ with wandb.init(project=project, config=config) as run:
             btc_value.append(env.btc_value.item())
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
+                last_done = True 
             else:
                 micro_obs, macro_obs = next_obs
-        # Optimisation phase
-        with torch.inference_mode():
-            next_micro_t = micro_obs.unsqueeze(0)
-            next_macro_t = macro_obs.unsqueeze(0)
-            _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
-            last_value = torch.tensor([next_value.item()], device=DEVICE)
+        if last_done:
+            last_value = torch.tensor([0.0], device=DEVICE)
+        else:
+            # Optimisation phase
+            with torch.inference_mode():
+                next_micro_t = micro_obs.unsqueeze(0)
+                next_macro_t = macro_obs.unsqueeze(0)
+                _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
+                last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
         buy_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
@@ -118,7 +123,7 @@ with wandb.init(project=project, config=config) as run:
         returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
-        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, global_step, BATCH_SIZE)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,

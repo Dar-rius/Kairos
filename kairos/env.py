@@ -107,11 +107,12 @@ class Env():
     def new_state(self) -> tuple[Tensor, Tensor]:
         macro_idx = int(min(self.time[0].item(), self.size - 1))
         price_idx = int(min(self.time[2].item(), self.price.shape[0] - 1))
-        daily_trades = self.hour_trade[self.time[1]:self.time[2]]
+        start = self.time[1].item()
+        end = self.time[2].item() + 1  
+        daily_trades = self.hour_trade[start:end]
         macro_days = self.macro_trade[macro_idx]
-        self.btc_value = self.price[price_idx]
-        self._next()
-        return (daily_trades, macro_days)
+        self.btc_value = self.price[price_idx]  # mise à jour du prix courant
+        return daily_trades, macro_days
 
     # mask actions
     def get_action_mask(self) -> Tensor:
@@ -123,24 +124,31 @@ class Env():
     # Reset the env to 0
     def reset(self, train:bool=True) -> tuple[Tensor, Tensor]:
         self._all_reset(train)
-        return self.new_state()
+        macro_idx = int(self.time[0].item())
+        price_idx = int(self.time[1].item())  # ou time[2] ? À voir selon ta logique
+        self.btc_value = self.price[price_idx]
+        daily_trades = self.hour_trade[self.time[1]:self.time[2]+1]  # +1 pour avoir 24h
+        macro_days = self.macro_trade[macro_idx]
+        return daily_trades, macro_days
 
     # The next step of env
-    def step(self, action:Tensor, entropy_b:Tensor|None=None) -> Any:
-        state = self.new_state()
+    def step(self, action:Tensor) -> Any:
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
-        # Sell
-        if action == 2:
-            action = torch.tensor([-1], device=self.device)
-            self._sell()
+        action_int = action.item()
         # Buy
-        elif action == 1: self._buy()
+        if action_int == 1: self._buy()
+        # Sell
+        elif action_int == 2:
+            action_int = -1
+            self._sell()
+        self._next()
+        next_state = self.new_state()
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
-        done = self.time[2] == self.hour_trade.shape[0]
-        truncate = self.calcul_portfolio_value() == 0
         #Compute the reward
         reward = reward_func(return_, action, self.prev_action, self.cost_rate)
-        self.prev_action.fill_(action.item())
-        return state, reward, state_pred, truncate, done
+        self.prev_action.fill_(action_int)
+        done = self.time[2] == self.hour_trade.shape[0]
+        truncate = self.calcul_portfolio_value() == 0
+        return next_state, reward, state_pred, truncate, done

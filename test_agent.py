@@ -10,7 +10,6 @@ from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from kairos.compute import calcul_sharpe_ratio,max_dd
 
-
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 AGENT_PATH = './agent/save/agent_saved.pt'

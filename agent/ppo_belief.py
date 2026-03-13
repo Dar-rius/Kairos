@@ -53,7 +53,7 @@ class PPOTrainer:
         dataset_size = actions.size(0)
         all_indices = torch.randperm(dataset_size, device=self.device)
         for _ in range(epochs):
-            for start in (0, dataset_size, batch_size):
+            for start in range(0, dataset_size, batch_size):
                 end = start + batch_size
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
@@ -80,6 +80,6 @@ class PPOTrainer:
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 self.optimizer.step()
         return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.mean().item()
