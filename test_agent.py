@@ -34,12 +34,13 @@ macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
 print(f"Load model from {AGENT_PATH}...")
 print(f"Load model from {BELIEF_PATH}...")
 macro_head.load_state_dict(torch.load(BELIEF_PATH, weights_only=True, map_location=DEVICE))
+macro_head.eval()
 agent = Agent(STATE_DIM[0], ACTION_DIM, pretrained_model=macro_head).to(DEVICE)
 agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
-agent.eval() # IMPORTANT : Met le modèle en mode évaluation (désactive Dropout, etc.)
+agent.eval()
 
 print("Run the Backtest...")
-micro_obs, macro_obs = env.reset(train=False)
+micro_obs, macro_obs = env.reset(train=True)
 
 # Tracking
 portfolio_history : deque[float] = deque()
@@ -68,8 +69,11 @@ for _ in tqdm(range(TEST_STEPS)):
     if n_days % 365 == 0 or n_days == TEST_STEPS:
         portfolio_s = pd.Series(copy_portfolio)
         returns = portfolio_s.pct_change().dropna()
-        sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24)
-        sharpes.append(sharpe.item())
+        if returns.std() == 0.0:
+            sharpes.append(0.0)
+        else:
+            sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24)
+            sharpes.append(sharpe.item())
         mdd.append(max_dd(portfolio_history))
         copy_portfolio.clear()
     if done: break
