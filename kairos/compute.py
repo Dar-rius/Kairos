@@ -8,6 +8,7 @@ from collections import deque
 
 def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor) -> float:
     if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
+    if action == 2: action = torch.tensor([-1], device=action.device)
     gain = (action * return_) * 100
     cost = fees * 100 * torch.abs(action - prev_action)
     reward = gain - cost

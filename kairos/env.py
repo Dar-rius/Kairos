@@ -117,7 +117,7 @@ class Env():
     # mask actions
     def get_action_mask(self) -> Tensor:
         mask = [True, True, True]
-        if self.total_amount[1] < 1.0: mask[2] = False
+        if self.total_amount[1] == 0.0: mask[2] = False
         else: mask[1] = False
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
@@ -139,9 +139,7 @@ class Env():
         # Buy
         if action_int == 1: self._buy()
         # Sell
-        elif action_int == 2:
-            action_int = -1
-            self._sell()
+        elif action_int == 2: self._sell()
         self._next()
         next_state = self.new_state()
         self._update_p_values()

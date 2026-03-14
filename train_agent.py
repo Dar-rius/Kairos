@@ -123,7 +123,7 @@ with wandb.init(project=project, config=config) as run:
         returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
-        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, global_step, BATCH_SIZE)
+        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,

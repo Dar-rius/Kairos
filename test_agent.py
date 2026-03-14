@@ -20,9 +20,10 @@ GRAPH_PATH = "./runs/test"
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
+usd_amount = 100000.0
 
 # Initialization
-env = Env(hour_df, macro_df, price_series, amount_usd=100000.0, use_scaler=True, device=DEVICE)
+env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
 TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
@@ -101,7 +102,7 @@ plt.grid(True)
 # Sub-graph 2: Porfolio Value
 plt.subplot(2, 1, 2)
 plt.plot(portfolio_history, label='Portfolio Value ($)', color='blue')
-plt.axhline(y=100000, color='r', linestyle='--', label='Initial Capital') # Assumant 100k départ
+plt.axhline(y=usd_amount, color='r', linestyle='--', label='Initial Capital') # Assumant 100k départ
 plt.title('Porfolio Evolution')
 plt.legend()
 plt.grid(True)
