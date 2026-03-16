@@ -27,14 +27,9 @@ class Env():
             scaled_macro = self.macro_scaler.fit_transform(macro_trade.values)
             self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
-        else:
-            self.hour_trade = torch.tensor(hour_trade.values, dtype=torch.float32, device=self.device)
-            self.macro_trade = torch.tensor(macro_trade.values, dtype=torch.float32, device=self.device)
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
         self.total_pnl = torch.zeros((4,1), dtype=torch.float32, device=self.device)
         self.btc_value = torch.tensor([0], dtype=torch.float32, device=self.device)
-        self.hour_trade = torch.tensor(hour_trade.values, dtype=torch.float32, device=self.device)
-        self.macro_trade = torch.tensor(macro_trade.values, dtype=torch.float32, device=self.device)
         self.state_pred = torch.tensor(state_pred.values, dtype=torch.int8, device=self.device) if state_pred is not None else None
         self.price = torch.tensor(price.values, dtype=torch.float32, device=self.device)
         # Time for trades [Day, Start Hour, Last Hour]
@@ -46,7 +41,9 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.prev_action = torch.tensor([0],dtype=torch.int32, device=self.device)
+        self.mu = 0.0
+        self.sigma2 = 1.0
+        self.sharpe_prev = 0.0
 
     def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
@@ -85,7 +82,9 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
-        self.prev_action.fill_(0)
+        self.mu = 0.0
+        self.sigma2 = 1.0
+        self.sharpe_prev = 0.0
 
     def _next(self):
         self.time[1] += 1
@@ -117,7 +116,7 @@ class Env():
     # mask actions
     def get_action_mask(self) -> Tensor:
         mask = [True, True, True]
-        if self.total_amount[1] == 0.0: mask[2] = False
+        if self.total_amount[1] < 1e-8: mask[2] = False
         else: mask[1] = False
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
@@ -125,7 +124,7 @@ class Env():
     def reset(self, train:bool=True) -> tuple[Tensor, Tensor]:
         self._all_reset(train)
         macro_idx = int(self.time[0].item())
-        price_idx = int(self.time[1].item())  # ou time[2] ? À voir selon ta logique
+        price_idx = int(self.time[2].item())
         self.btc_value = self.price[price_idx]
         daily_trades = self.hour_trade[self.time[1]:self.time[2]+1]  # +1 pour avoir 24h
         macro_days = self.macro_trade[macro_idx]
@@ -145,8 +144,7 @@ class Env():
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
         #Compute the reward
-        reward = reward_func(return_, action, self.prev_action, self.cost_rate)
-        self.prev_action.fill_(action_int)
+        reward, self.mu, self.sigma2, self.sharpe_prev = reward_func(return_, self.mu, self.sigma2, self.sharpe_prev)
         done = self.time[2] == self.hour_trade.shape[0]
         truncate = self.calcul_portfolio_value() == 0
         return next_state, reward, state_pred, truncate, done

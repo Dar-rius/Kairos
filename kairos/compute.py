@@ -5,15 +5,20 @@ import math
 import torch
 from torch import Tensor
 from collections import deque
+from math import *
 
-def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor) -> float:
-    if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
-    if action == 2: action = torch.tensor([-1], device=action.device)
-    gain = (action * return_) * 100
-    cost = fees * 100 * torch.abs(action - prev_action)
-    reward = gain - cost
-    final_reward = torch.clamp(reward, -10.0, 10.0)
-    return final_reward.item()
+def reward_func(return_:Tensor, mu: float, sigma2:float, sharpe_prev: float, eta: float=0.01) -> tuple[float, float, float, float]:
+    if torch.isnan(return_).any() or torch.isinf(return_).any():
+        return -10.0, mu, sigma2, sharpe_prev
+    r = return_.item()
+    delta = r - mu
+    mu += eta * delta
+    sigma2 += eta * (delta**2 - sigma2)
+    sigma = sqrt(sigma2 + 1e-8)
+    sharpe = mu / sigma
+    reward_final = (sharpe - sharpe_prev) * 100
+    sharpe_prev = sharpe
+    return np.clip(reward_final, -50, 50).item(), mu, sigma2, sharpe_prev
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
