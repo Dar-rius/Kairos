@@ -11,7 +11,6 @@ import pandas as pd
 from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
 
-
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
@@ -24,9 +23,9 @@ LR = 3e-4
 GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.1
+ENT_COEF = 0.05
 VALUE_COEF = 0.4
-BELIEF_COEF = 0.5
+BELIEF_COEF = 0.3
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -34,7 +33,7 @@ macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 
-TOTAL_TIMESTAMP = 1000000
+TOTAL_TIMESTAMP = 2000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -99,7 +98,7 @@ with wandb.init(project=project, config=config) as run:
             btc_value.append(env.btc_value.item())
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
-                last_done = True 
+                last_done = True
             else:
                 micro_obs, macro_obs = next_obs
         if last_done:

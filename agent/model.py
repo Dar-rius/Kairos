@@ -50,7 +50,7 @@ class Agent(nn.Module):
             nn.ReLU(),
             nn.Linear(256, action_dim))
         
-        self.critic = nn.Linear(fusion_dim, 1)
+        self.critic = nn.Linear(action_dim, 1)
         
         self._init_weights()
 
@@ -82,7 +82,7 @@ class Agent(nn.Module):
         # FUSION (context)
         context = torch.cat([micro_feat, macro_feat, current_belief_probs], dim=1)
         action_logits = self.actor_layer(context)
-        value = self.critic(context)
+        value = self.critic(action_logits)
         return action_logits, value, belief_logits
 
     def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int|None=None, mask_action:Tensor=None):
@@ -112,7 +112,7 @@ class FocalLoss(nn.Module):
 
     def forward(self, inputs, targets):
         ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
-        pt = torch.exp(-ce_loss) # Probabilité de la classe correcte
+        pt = torch.exp(-ce_loss) 
         
         # Application de l'équation de la Focal Loss
         focal_loss = ((1 - pt) ** self.gamma) * ce_loss

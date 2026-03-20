@@ -119,12 +119,12 @@ final_optimizer = optim.Adam(final_macro_head.parameters(), lr=LR)
 final_macro_head.train()
 for epoch in range(EPOCHS):
     for batch_x, batch_y in train_loader_final:
-        optimizer.zero_grad()
-        _, logits = model(batch_x)
+        final_optimizer.zero_grad()
+        _, logits = final_macro_head(batch_x)
         loss = criterion(logits, batch_y)
         loss.backward()
-        optimizer.step()
+        final_optimizer.step()
 
-if not os.path.exists(MAT_CONF_PATH): os.makedirs(MODEL_PATH)
-torch.save(final_macro_head.state_dict(), f'{MAT_CONF_PATH}/belief_head.pt')
-print(f"Model saved: {MAT_CONF_PATH}/belief_head.pt")
+if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
+torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/belief_head.pt')
+print(f"Model saved: {MODEL_PATH}/belief_head.pt")

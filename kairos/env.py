@@ -41,9 +41,8 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.mu = 0.0
-        self.sigma2 = 1.0
-        self.sharpe_prev = 0.0
+        self.ema_return:float = 0.0
+        self.ema_sq_return:float = 0.0
 
     def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
@@ -82,9 +81,8 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
-        self.mu = 0.0
-        self.sigma2 = 1.0
-        self.sharpe_prev = 0.0
+        self.ema_return:float = 0.0
+        self.ema_sq_return:float = 0.0
 
     def _next(self):
         self.time[1] += 1
@@ -110,7 +108,7 @@ class Env():
         end = self.time[2].item() + 1  
         daily_trades = self.hour_trade[start:end]
         macro_days = self.macro_trade[macro_idx]
-        self.btc_value = self.price[price_idx]  # mise à jour du prix courant
+        self.btc_value = self.price[price_idx]
         return daily_trades, macro_days
 
     # mask actions
@@ -144,7 +142,7 @@ class Env():
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
         #Compute the reward
-        reward, self.mu, self.sigma2, self.sharpe_prev = reward_func(return_, self.mu, self.sigma2, self.sharpe_prev)
+        reward, self.ema_return, self.ema_sq_return = reward_func(return_, self.ema_return, self.ema_sq_return)
         done = self.time[2] == self.hour_trade.shape[0]
         truncate = self.calcul_portfolio_value() == 0
         return next_state, reward, state_pred, truncate, done

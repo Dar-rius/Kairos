@@ -7,18 +7,28 @@ from torch import Tensor
 from collections import deque
 from math import *
 
-def reward_func(return_:Tensor, mu: float, sigma2:float, sharpe_prev: float, eta: float=0.01) -> tuple[float, float, float, float]:
-    if torch.isnan(return_).any() or torch.isinf(return_).any():
-        return -10.0, mu, sigma2, sharpe_prev
-    r = return_.item()
-    delta = r - mu
-    mu += eta * delta
-    sigma2 += eta * (delta**2 - sigma2)
-    sigma = sqrt(sigma2 + 1e-8)
-    sharpe = mu / sigma
-    reward_final = (sharpe - sharpe_prev) * 100
-    sharpe_prev = sharpe
-    return np.clip(reward_final, -50, 50).item(), mu, sigma2, sharpe_prev
+def reward_func(return_:Tensor, ema_return:float, ema_sq_return:float, eta: float = 0.01) -> tuple:
+    net_return = return_.item()
+
+    A_prev = ema_return
+    B_prev = ema_sq_return
+
+    variance:float = B_prev - (A_prev ** 2)
+    if variance < 1e-8:
+        variance = 1e-8
+
+    delta_A = net_return - A_prev
+    delta_B = (net_return ** 2) - B_prev
+
+    numerator = (B_prev * delta_A) - (0.5 * A_prev * delta_B)
+    denominator = math.pow(variance, 1.5)
+    dsr = numerator / denominator
+
+    ema_return = A_prev + eta * delta_A
+    ema_sq_return = B_prev + eta * delta_B
+
+    reward = np.clip(dsr, -1.0, 1.0)
+    return (reward.item(), ema_return, ema_sq_return)
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:
