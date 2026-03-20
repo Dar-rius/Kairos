@@ -54,6 +54,7 @@ config = {
         'gamma': GAMMA,
         'gae_lambda': GAE_LAMBDA,
         'clip_eps': CLIP_EPS,
+        'ent_coef': ENT_COEF,
         'value_coef': VALUE_COEF,
         'belief_coef': BELIEF_COEF
         }
