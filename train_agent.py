@@ -23,9 +23,9 @@ LR = 3e-4
 GAMMA = 0.97
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.1
-VALUE_COEF = 0.4
-BELIEF_COEF = 0.3
+ENT_COEF = 0.02
+VALUE_COEF = 0.3
+BELIEF_COEF = 0.2
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
