@@ -15,6 +15,7 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, cla
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
 from collections import deque
+import joblib
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
@@ -125,6 +126,22 @@ for epoch in range(EPOCHS):
         loss.backward()
         final_optimizer.step()
 
-if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
-torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/belief_head.pt')
-print(f"Model saved: {MODEL_PATH}/belief_head.pt")
+has_nan = False
+for name, param in final_macro_head.named_parameters():
+    if torch.isnan(param).any():
+        print(f"ERROR : The layer {name} had some NaN values")
+        has_nan = True
+        break
+
+if has_nan:
+    print("Can't Save Model")
+else:
+    if not os.path.exists(MODEL_PATH): 
+        os.makedirs(MODEL_PATH)
+        
+    # 1. Sauvegarde du modèle réparé
+    torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/belief_head.pt')
+    print(f"Model is saved in: {MODEL_PATH}/belief_head.pt")
+
+    joblib.dump(scaler, f'{MODEL_PATH}/macro_scaler.pkl')
+    print(f"✅ Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")

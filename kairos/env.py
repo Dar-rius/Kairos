@@ -8,6 +8,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from typing import Any
 from sklearn.preprocessing import StandardScaler
+import joblib
 
 # ******* ENV **********
 class Env():
@@ -22,9 +23,9 @@ class Env():
         if self.use_scaler:
             # Normalized all dataset
             self.micro_scaler = StandardScaler()
-            self.macro_scaler = StandardScaler()
+            self.macro_scaler = joblib.load("./agent/save/macro_scaler.pkl")
             scaled_hour = self.micro_scaler.fit_transform(hour_trade.values)
-            scaled_macro = self.macro_scaler.fit_transform(macro_trade.values)
+            scaled_macro = self.macro_scaler.transform(macro_trade.values)
             self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
