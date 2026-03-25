@@ -1,6 +1,6 @@
 import pandas as pd 
 
-norm_price = pd.read_csv("./data_off/btc-usd.csv")
+#norm_price = pd.read_csv("./data_off/btc-usd.csv")
 #df_metric = pd.read_csv("./data_off/metric_market.csv")
 #train test
 metric_pretrain = pd.read_csv("./data_off/train_test/metric_pretrain.csv")
