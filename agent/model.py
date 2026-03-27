@@ -74,8 +74,6 @@ class Agent(nn.Module):
     def forward(self, micro_x:Tensor, macro_x:Tensor):
         # System 2
         macro_feat, belief_logits = self.belief_head(macro_x)
-        if torch.isnan(macro_feat).any():
-            raise ValueError("🚨 COUPABLE TROUVÉ : Le MacroHead génère des NaNs (poids corrompus) !")
         current_belief_probs = torch.softmax(belief_logits, dim=1)
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()

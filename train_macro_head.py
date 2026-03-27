@@ -94,11 +94,6 @@ for train_index, val_index in tscv.split(X):
 precision = precision_score(all_y_true, all_y_pred, average='weighted', zero_division=0)
 recall = recall_score(all_y_true, all_y_pred, average='weighted', zero_division=0)
 
-print(f"Précision Globale (Weighted): {precision:.4f}")
-print(f"Recall Global (Weighted)   : {recall:.4f}")
-print("\nRapport Détaillé par Classe :")
-print(classification_report(all_y_true, all_y_pred, target_names=class_names, zero_division=0))
-
 # Plot the confusion matrix
 cm = confusion_matrix(all_y_true, all_y_pred)
 plt.figure(figsize=(8, 6))
