@@ -37,6 +37,10 @@ df_final = df_full.dropna()
 feature_cols = ['mvrv_z_score','mom_24h','mom_168h','mom_168h_z','hashRate_change','log_return','drawdown_micro', 'vol_garch',  'vol_parkinson', 'RSI_7','RSI_14', 'mvrv_momentum', 'nvt_momentum', 'rsi_slop', 'mvrv_lag1', 'mvrv_lag3', 'vol_lag1', 'vol_lag3', 'vol_diff', 'mvrv_diff', 'hashRate_ma7']
 X = df_final[feature_cols].values.astype(np.float32)
 y = df_final['regime'].values.astype(np.int64)
+print(train_feature_set.isna().sum())
+print(train_target_set.isna().sum())
+print(np.isinf(X).sum())
+print(np.isinf(y).sum())
 fold = 0
 weights_tensor = torch.FloatTensor([1., 1.3, 3.])
 
@@ -126,22 +130,13 @@ for epoch in range(EPOCHS):
         loss.backward()
         final_optimizer.step()
 
-has_nan = False
-for name, param in final_macro_head.named_parameters():
-    if torch.isnan(param).any():
-        print(f"ERROR : The layer {name} had some NaN values")
-        has_nan = True
-        break
 
-if has_nan:
-    print("Can't Save Model")
-else:
-    if not os.path.exists(MODEL_PATH): 
-        os.makedirs(MODEL_PATH)
-        
-    # 1. Sauvegarde du modèle réparé
-    torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/belief_head.pt')
-    print(f"Model is saved in: {MODEL_PATH}/belief_head.pt")
+if not os.path.exists(MODEL_PATH): 
+    os.makedirs(MODEL_PATH)
+    
+# 1. Sauvegarde du modèle réparé
+torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/belief_head.pt')
+print(f"Model is saved in: {MODEL_PATH}/belief_head.pt")
 
-    joblib.dump(scaler, f'{MODEL_PATH}/macro_scaler.pkl')
-    print(f"✅ Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")
+joblib.dump(scaler, f'{MODEL_PATH}/macro_scaler.pkl')
+print(f"✅ Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")

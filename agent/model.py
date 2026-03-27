@@ -10,11 +10,11 @@ class MacroHead(nn.Module):
         super(MacroHead, self).__init__()
         self.macro_net = nn.Sequential(
             nn.Linear(macro_dim, 128),
-            nn.LayerNorm(128),     # Stabilise les signaux financiers
+            nn.LayerNorm(128),     
             nn.ReLU(),
-            nn.Dropout(0.3),         # Désactive 30% des neurones (Anti-Overfit)
+            nn.Dropout(0.3),         
             nn.Linear(128, 32),
-            nn.LayerNorm(32),      # Stabilise encore
+            nn.LayerNorm(32),
             nn.ReLU(),
             nn.Dropout(0.2)
         )
@@ -50,7 +50,7 @@ class Agent(nn.Module):
             nn.ReLU(),
             nn.Linear(256, action_dim))
         
-        self.critic = nn.Linear(action_dim, 1)
+        self.critic = nn.Linear(fusion_dim, 1)
         
         self._init_weights()
 
@@ -84,7 +84,7 @@ class Agent(nn.Module):
         # FUSION (context)
         context = torch.cat([micro_feat, macro_feat, current_belief_probs], dim=1)
         action_logits = self.actor_layer(context)
-        value = self.critic(action_logits)
+        value = self.critic(context)
         return action_logits, value, belief_logits
 
     def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int|None=None, mask_action:Tensor=None):

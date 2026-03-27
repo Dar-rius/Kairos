@@ -1,15 +1,13 @@
-# 1. Image OFFICIELLE pour Jetson Thor (ARM64) avec PyTorch et CUDA pré-compilés
-FROM nvcr.io/nvidia/pytorch:24.09-py3-igpu
+FROM nvcr.io/nvidia/pytorch:25.08-py3
+
+WORKDIR /build
 
 WORKDIR /kairos
-
-# 2. Copier les dépendances et les données
 COPY requirements.txt .
-COPY data_off ./data_off
+RUN pip install --force-reinstall numpy==1.26.4 wandb && \
+    pip install -r requirements.txt 
 
-# 3. Installer les librairies (en forçant NumPy 1.x pour éviter le crash PyTorch)
-RUN pip install -r requirements.txt
-RUN pip install wandb "numpy<2"
+RUN pip uninstall numpy -y && \
+    pip install numpy==1.26.4 --force-reinstall --no-binary :all:
 
-# 4. Copier le reste du projet
 COPY . .
