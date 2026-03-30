@@ -8,7 +8,7 @@ import numpy as np
 from agent.model import MacroHead, FocalLoss
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, f1_score
 from torch import nn
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
@@ -19,7 +19,7 @@ from collections import deque
 import joblib
 
 #Generate and plot Confusion matrix 
-def gen_conf_matrix(y_true: Tensor, y_pred: Tensor, path:str):
+def gen_conf_matrix(y_true: np.array, y_pred: np.array, path:str, class_names:list):
 # Plot the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
@@ -33,6 +33,18 @@ def gen_conf_matrix(y_true: Tensor, y_pred: Tensor, path:str):
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     plt.savefig(f"{path}/confusion_matrix_{timestamp}.png")
     print(f"Confusion Matrix saved: {path}/confusion_matrix_{timestamp}.png")
+
+def gen_metric(y_true:deque[int], y_pred:deque[int], class_names:list):
+    precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='weighted')
+
+    print(f"Précision Globale (Weighted): {precision:.4f}")
+    print(f"Recall Global (Weighted)   : {recall:.4f}")
+    print(f"F1-Score Global (Weighted)   : {f1:.4f}")
+    print("\nRapport Détaillé par Classe :")
+    print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+
 
 
 DATA_PATH = './data_off/train_test/'
@@ -49,7 +61,8 @@ all_y_belief_true : deque[int] = deque()
 all_y_belief_pred : deque[int] = deque()
 all_y_change_true : deque[int] = deque()
 all_y_change_pred : deque[int] = deque()
-class_names = ['Stable (0)', 'Volatile (1)', 'Crisis (2)']
+class_names_belief = ['Stable (0)', 'Volatile (1)', 'Crisis (2)']
+class_names_change = ['NO CHANGE (0)', 'CHANGE (1)']
 tscv = TimeSeriesSplit(n_splits=10)
 
 df_full = pd.merge(train_feature_set, train_target_belief, left_index=True, right_index=True)
@@ -62,7 +75,8 @@ X = df_final[feature_cols].values.astype(np.float32)
 y_belief = df_final['regime'].values.astype(np.int64)
 y_change = df_final['change'].values.astype(np.int64)
 fold = 0
-weights_tensor = torch.FloatTensor([1., 1.3, 3.])
+weights_tensor_belief = torch.FloatTensor([1., 1.3, 3.])
+weights_tensor_change = torch.FloatTensor([ .78, 1.])
 
 for train_index, val_index in tscv.split(X):
     fold += 1
@@ -80,12 +94,13 @@ for train_index, val_index in tscv.split(X):
     train_tensor = TensorDataset(torch.FloatTensor(X_train_scaled), torch.LongTensor(y_train_belief), torch.LongTensor(y_train_change))
     train_loader = DataLoader(train_tensor, batch_size=BATCH_SIZE, shuffle=True)
     X_val_tensor = torch.FloatTensor(X_val_scaled)
-    y_val_belief = torch.LongTensor(y_val_belief)
-    y_val_change = torch.LongTensor(y_val_change)
+    y_val_belief_tensor = torch.LongTensor(y_val_belief)
+    y_val_change_tensor = torch.LongTensor(y_val_change)
 
-    criterion_belief = FocalLoss(alpha=weights_tensor, gamma=2.0)
-    criterion_change = nn.CrossEntropyLoss(alpha=weights_tensor, gamma=2.0)
-    model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=1)
+    criterion_belief = FocalLoss(alpha=weights_tensor_belief)
+    #criterion_change = nn.CrossEntropyLoss()
+    criterion_change = FocalLoss(alpha=weights_tensor_change)
+    model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
     #criterion = nn.CrossEntropyLoss(weight=weights_tensor)
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     model.train()
@@ -95,8 +110,8 @@ for train_index, val_index in tscv.split(X):
             _, belief_logit, change_logit = model(batch_x)
             belief_loss = criterion_belief(belief_logit, batch_y_belief)
             change_loss = criterion_change(change_logit, batch_y_change)
-            belief_loss.backward()
-            change_loss.backward()
+            global_loss = belief_loss + change_loss
+            global_loss.backward()
             optimizer.step()
     model.eval()
     with torch.no_grad():
@@ -113,18 +128,24 @@ for train_index, val_index in tscv.split(X):
     print(f"Fold {fold} belief: Accuracy = {fold_acc_belief:.2%}")
     print(f"Fold {fold} change: Accuracy = {fold_acc_change:.2%}")
 
+#belief_head's Metrics
+gen_metric(all_y_belief_true, all_y_belief_pred, class_names_belief)
+
+#change_head's Metrics
+gen_metric(all_y_change_true, all_y_change_pred, class_names_change)
+
 # Plot the confusion matrix belief
-gen_conf_matrix(all_y_belief_true, all_y_belief_pred, f"{MAT_CONF_PATH}/belief")
+gen_conf_matrix(all_y_belief_true, all_y_belief_pred, f"{MAT_CONF_PATH}/belief", class_names_belief)
 # Plot the confusion matrix change
-gen_conf_matrix(all_y_change_true, all_y_change_pred, f"{MAT_CONF_PATH}/change")
+gen_conf_matrix(all_y_change_true, all_y_change_pred, f"{MAT_CONF_PATH}/change", class_names_change)
 
 #Train the finale model and saved it
 scaler = StandardScaler()
 x_full_final = scaler.fit_transform(X)
-train_tensor_final = TensorDataset(torch.FloatTensor(x_full_final), torch.LongTensor(y_train_belief), torch.LongTensor(y_train_change))
+train_tensor_final = TensorDataset(torch.FloatTensor(x_full_final), torch.LongTensor(y_belief), torch.LongTensor(y_change))
 train_loader_final = DataLoader(train_tensor_final, batch_size=BATCH_SIZE, shuffle=True)
 
-final_macro_head = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=1)
+final_macro_head = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
 final_optimizer = optim.Adam(final_macro_head.parameters(), lr=LR)
 final_macro_head.train()
 for epoch in range(EPOCHS):
@@ -133,8 +154,8 @@ for epoch in range(EPOCHS):
         _, logit_belief, logit_change = final_macro_head(batch_x)
         loss_belief = criterion_belief(logit_belief, batch_y_belief)
         loss_change = criterion_change(logit_change, batch_y_change)
-        loss_belief.backward()
-        loss_change.backward()
+        global_loss = loss_belief + loss_change
+        global_loss.backward()
         final_optimizer.step()
 
 if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
@@ -143,4 +164,4 @@ torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/macro_head.pt')
 print(f"Model is saved in: {MODEL_PATH}/macro_head.pt")
 
 joblib.dump(scaler, f'{MODEL_PATH}/macro_scaler.pkl')
-print(f"✅ Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")
+print(f"Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")

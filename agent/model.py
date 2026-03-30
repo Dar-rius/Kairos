@@ -6,7 +6,7 @@ from torch import Tensor
 import numpy as np
 
 class MacroHead(nn.Module):
-    def __init__(self, macro_dim:int, num_regimes:int=3, num_changes:int=1):
+    def __init__(self, macro_dim:int, num_regimes:int=3, num_changes:int=2):
         super(MacroHead, self).__init__()
         self.macro_net = nn.Sequential(
             nn.Linear(macro_dim, 128),
@@ -41,7 +41,7 @@ class MacroHead(nn.Module):
         return x, belief_logits, change_logits
 
 class Agent(nn.Module):
-    def __init__(self, pretrained_model:MacroHead, micro_dim:int, action_dim:int, num_regimes:int=3, num_change:int=1):
+    def __init__(self, pretrained_model:MacroHead, micro_dim:int, action_dim:int, num_regimes:int=3, num_change:int=2):
         super(Agent, self).__init__()
         self.belief_head = pretrained_model
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
