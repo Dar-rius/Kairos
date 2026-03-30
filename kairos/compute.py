@@ -46,8 +46,6 @@ def max_dd(portfolio: deque[float], dd:bool=False) -> float:
 
 def calcul_cost(amount: Tensor, cost_rate: Tensor) -> Tensor: return amount * cost_rate
 
-#def compute_entropy(prob: list[float]): return entropy(prob, base=2)
-
 def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
 
 def return_log_vec(data: list, device:str) -> Tensor:

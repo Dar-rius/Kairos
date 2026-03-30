@@ -37,7 +37,8 @@ def gen_conf_matrix(y_true: Tensor, y_pred: Tensor, path:str):
 
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
-train_target_set = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
+train_target_belief = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
+train_target_change = pd.read_csv(f"{DATA_PATH}change_pretrain.csv").iloc[:, 1:]
 MAT_CONF_PATH = "./runs/train_macro"
 MODEL_PATH = "./agent/save"
 LR = 0.0008
@@ -51,7 +52,8 @@ all_y_change_pred : deque[int] = deque()
 class_names = ['Stable (0)', 'Volatile (1)', 'Crisis (2)']
 tscv = TimeSeriesSplit(n_splits=10)
 
-df_full = pd.merge(train_feature_set, train_target_set, left_index=True, right_index=True)
+df_full = pd.merge(train_feature_set, train_target_belief, left_index=True, right_index=True)
+df_full = pd.merge(df_full, train_target_change , left_index=True, right_index=True)
 df_full["regime"] = df_full["regime"].shift(-1)
 df_full["change"] = df_full["change"].shift(-1)
 df_final = df_full.dropna()
@@ -136,7 +138,6 @@ for epoch in range(EPOCHS):
         final_optimizer.step()
 
 if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
-    
 # 1. Sauvegarde du modèle réparé
 torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/macro_head.pt')
 print(f"Model is saved in: {MODEL_PATH}/macro_head.pt")
