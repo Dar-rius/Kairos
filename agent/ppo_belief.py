@@ -8,7 +8,7 @@ from .model import Agent
 
 # Belief PPO Implementation
 class PPOTrainer:
-    def __init__(self, model:Agent, device:str, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, ent_coef:float=0.01):
+    def __init__(self, model:Agent, device:str, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, change_coef:float=0.5, ent_coef:float=0.01):
         self.model = model
         self.lr = lr
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
@@ -19,9 +19,11 @@ class PPOTrainer:
         # Total Loss Coefficients
         self.value_coef = value_coef
         self.belief_coef = belief_coef
+        self.change_coef = change_coef
         self.ent_coef = ent_coef
         self.mse_loss = nn.MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
+        self.bce_loss = nn.CrossEntropyLoss()
         self.device = device
 
     def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor, Tensor]:
@@ -47,7 +49,7 @@ class PPOTrainer:
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
         self.lr_decay(self.lr, total_steps, step)
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _, target_regimes = memory.get_all()
+        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _, target_regimes, target_changes = memory.get_all()
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
@@ -58,7 +60,7 @@ class PPOTrainer:
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits, belief_entropy = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)
@@ -71,15 +73,17 @@ class PPOTrainer:
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx].flatten())
                 # Loss Belief (Auxiliary) - Cross Entropy
                 belief_loss = self.ce_loss(belief_logits, target_regimes[idx].flatten().long())
+                change_loss = self.bce_loss(change_logits, target_changes[idx].flatten().long())
                 entropy_loss = dist_entropy.mean()
                 # Total Loss
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
-                       (self.belief_coef * belief_loss) - \
+                       (self.belief_coef * belief_loss) + \
+                       (self.change_coef * change_loss) - \
                        (self.ent_coef * entropy_loss)
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 self.optimizer.step()
-        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), dist_entropy.mean().item()
+        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), change_loss.item(), dist_entropy.mean().item()

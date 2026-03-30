@@ -26,12 +26,14 @@ CLIP_EPS = 0.2
 ENT_COEF = 0.02
 VALUE_COEF = 0.3
 BELIEF_COEF = 0.2
+CHANGE_COEF = 0.2
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
+change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["regime"]
 
 TOTAL_TIMESTAMP = 3000000
 BATCH_SIZE = 128
@@ -41,9 +43,9 @@ env = Env(hour_df, macro_df, price_series, state_series, use_scaler=True, device
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
-belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
-agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
-trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF, device=DEVICE)
+belief_model.load_state_dict(torch.load("./agent/save/macro_head.pt", weights_only=True))
+agent = Agent(belief_model, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
+trainer = PPOTrainer(agent, lr=LR, gamma=GAMMA, gae_lambda=GAE_LAMBDA, ent_coef=ENT_COEF, value_coef=VALUE_COEF, belief_coef=BELIEF_COEF,  change_coef=CHANGE_COEF, device=DEVICE)
 buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
 #wanbd variable
@@ -56,7 +58,8 @@ config = {
         'clip_eps': CLIP_EPS,
         'ent_coef': ENT_COEF,
         'value_coef': VALUE_COEF,
-        'belief_coef': BELIEF_COEF
+        'belief_coef': BELIEF_COEF,
+        'change_coef': CHANGE_COEF
         }
 
 # Run env
@@ -78,9 +81,9 @@ with wandb.init(project=project, config=config) as run:
             macro_t = macro_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            next_obs, reward, target_regime, truncate, done = env.step(action_t)
+            next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
             buffer.insert(
@@ -91,7 +94,8 @@ with wandb.init(project=project, config=config) as run:
                 reward=reward,
                 value=value_t,
                 dones = done_casted,
-                target_regime=target_regime
+                target_regime=target_regime,
+                target_change=target_change
             )
             cumulative_reward += reward
             cumulative_pnl += env.get_pnl()
@@ -123,13 +127,14 @@ with wandb.init(project=project, config=config) as run:
         returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
-        loss, policy_loss, value_loss, belief_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,
                  'policy loss': policy_loss,
                  'value loss': value_loss,
                  'belief loss': belief_loss,
+                 'change loss': change_loss,
                  'entropy': entropy,
                  'reward': cumulative_reward,
                  'pnl': cumulative_pnl,
@@ -142,4 +147,4 @@ with wandb.init(project=project, config=config) as run:
 #Save model
 if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')
-torch.save(belief_model.state_dict(), './agent/save/belief_head_1.pt')
+torch.save(belief_model.state_dict(), './agent/save/macro_head_1.pt')

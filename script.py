@@ -45,17 +45,23 @@ price_test.to_csv("./data_off/train_test/price_test.csv")
 
 #Pretain from metric
 state_pretrain = metric_pretrain["regime"]
+change_pretrain = metric_pretrain["change"]
 state_pretrain.to_csv("./data_off/train_test/state_pretrain.csv")
-metric_pretrain = metric_pretrain.drop(["date", "regime"], axis=1)
+change_pretrain.to_csv("./data_off/train_test/change_pretrain.csv")
+metric_pretrain = metric_pretrain.drop(["date", "regime", "change"], axis=1)
 metric_pretrain.to_csv("./data_off/train_test/metric_pretrain.csv")
 
 # Train form metric
 state_train = metric_train["regime"]
+change_train = metric_train["change"]
 state_train.to_csv("./data_off/train_test/state_train.csv")
-metric_train = metric_train.drop(["date", "regime"], axis=1)
+change_train.to_csv("./data_off/train_test/change_train.csv")
+metric_train = metric_train.drop(["date", "regime", "change"], axis=1)
 metric_train.to_csv("./data_off/train_test/metric_train.csv")
 # Test form metric
 state_test = metric_test["regime"]
+change_test = metric_test["change"]
 state_test.to_csv("./data_off/train_test/state_test.csv")
-metric_test = metric_test.drop(["date", "regime"], axis=1)
+change_test.to_csv("./data_off/train_test/change_test.csv")
+metric_test = metric_test.drop(["date", "regime", "change"], axis=1)
 metric_test.to_csv("./data_off/train_test/metric_test.csv")

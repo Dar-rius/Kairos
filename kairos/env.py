@@ -13,7 +13,7 @@ import joblib
 # ******* ENV **********
 class Env():
     def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame,
-                 price:pd.Series, state_pred:pd.Series=None,
+                 price:pd.Series, state_pred:pd.Series=None, change_pred:pd.Series=None,
                  amount_usd:float=100000.0, cost_rate:float=0.001,
                  device:str='cpu', use_scaler:bool=False
                  ):
@@ -33,6 +33,7 @@ class Env():
         self.total_pnl = torch.zeros((4,1), dtype=torch.float32, device=self.device)
         self.btc_value = torch.tensor([0], dtype=torch.float32, device=self.device)
         self.state_pred = torch.tensor(state_pred.values, dtype=torch.int8, device=self.device) if state_pred is not None else None
+        self.change_pred = torch.tensor(change_pred.values, dtype=torch.int8, device=self.device) if change_pred is not None else None
         self.price = torch.tensor(price.values, dtype=torch.float32, device=self.device)
         # Time for trades [Day, Start Hour, Last Hour]
         self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
@@ -132,6 +133,7 @@ class Env():
     def step(self, action:Tensor) -> Any:
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
+        change_pred = self.change_pred[future_idx] if self.change_pred is not None else None
         action_int = action.item()
         # Buy
         if action_int == 1: self._buy()
@@ -146,4 +148,4 @@ class Env():
         self.prev_action.fill_(action_int)
         done = self.time[2] == self.hour_trade.shape[0]
         truncate = self.calcul_portfolio_value() == 0
-        return next_state, reward, state_pred, truncate, done
+        return next_state, reward, state_pred, change_pred, truncate, done

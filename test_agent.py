@@ -13,7 +13,7 @@ from kairos.compute import calcul_sharpe_ratio,max_dd
 # Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 AGENT_PATH = './agent/save/agent_saved.pt'
-BELIEF_PATH = './agent/save/belief_head_1.pt'
+BELIEF_PATH = './agent/save/macro_head_1.pt'
 DATA_PATH = './data_off/train_test/'
 GRAPH_PATH = "./runs/test"
 # DataFrame 

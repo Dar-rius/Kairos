@@ -14,6 +14,7 @@ class Buffer:
     7 -> Value
     8 -> Dones
     9 -> Target Regime
+    10 -> Target Change
     """
     def __init__(self, step:int, micro_size:int, macro_size:int, device:str):
         self.step = step
@@ -26,11 +27,12 @@ class Buffer:
         self.returns = torch.zeros((self.step), device=self.device)
         self.adv = torch.zeros((self.step), device=self.device)
         self.target_regimes = torch.zeros((self.step), dtype=torch.long, device=self.device)
+        self.target_changes = torch.zeros((self.step), dtype=torch.long, device=self.device)
         self.rewards = torch.zeros((self.step), device=self.device)
         self.values = torch.zeros((self.step), device=self.device)
         self.dones = torch.zeros((self.step), device=self.device)
 
-    def insert(self, micro_state:Tensor, macro_state:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor):
+    def insert(self, micro_state:Tensor, macro_state:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
         self.actions[self.slice] = action
@@ -39,6 +41,7 @@ class Buffer:
         self.values[self.slice] = value
         self.dones[self.slice] = dones
         self.target_regimes[self.slice] = target_regime
+        self.target_changes[self.slice] = target_change
         self.slice += 1
 
     def insert_returns(self, returns:Tensor, adv:Tensor):
@@ -49,8 +52,8 @@ class Buffer:
     def get_all(self) -> tuple:
         return (self.micro_states, self.macro_states,
                 self.actions, self.old_log_probs,
-                self.returns, self.adv, self.rewards, 
-                self.values, self.dones, self.target_regimes)
+                self.returns, self.adv, self.rewards,
+                self.values, self.dones, self.target_regimes, self.target_changes)
 
     # Delete all data
     def clear(self):

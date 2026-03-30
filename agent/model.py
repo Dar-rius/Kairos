@@ -6,7 +6,7 @@ from torch import Tensor
 import numpy as np
 
 class MacroHead(nn.Module):
-    def __init__(self, macro_dim:int, num_regimes:int=3):
+    def __init__(self, macro_dim:int, num_regimes:int=3, num_changes:int=1):
         super(MacroHead, self).__init__()
         self.macro_net = nn.Sequential(
             nn.Linear(macro_dim, 128),
@@ -19,6 +19,7 @@ class MacroHead(nn.Module):
             nn.Dropout(0.2)
         )
         self.belief_head = nn.Linear(32, num_regimes)
+        self.change_head = nn.Linear(32, num_changes)
         self._init_weights()
 
     def _init_weights(self):
@@ -29,21 +30,25 @@ class MacroHead(nn.Module):
 
         nn.init.orthogonal_(self.belief_head.weight, gain=1.0)
         nn.init.constant_(self.belief_head.bias, 0.0)
+        
+        nn.init.orthogonal_(self.change_head.weight, gain=1.0)
+        nn.init.constant_(self.change_head.bias, 0.0)
 
     def forward(self, macro_x:Tensor):
         x = self.macro_net(macro_x)
         belief_logits = self.belief_head(x)
-        return x, belief_logits
+        change_logits = self.change_head(x)
+        return x, belief_logits, change_logits
 
 class Agent(nn.Module):
-    def __init__(self, micro_dim:int, action_dim:int, num_regimes:int=3, pretrained_model=None):
+    def __init__(self, pretrained_model:MacroHead, micro_dim:int, action_dim:int, num_regimes:int=3, num_change:int=1):
         super(Agent, self).__init__()
         self.belief_head = pretrained_model
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
         
         # --- FUSION HIÉRARCHIQUE ---
         # 128 (Micro) + 32 (Macro Context) + 3 (Macro Explicit Prediction)
-        fusion_dim = 128 + 32 + num_regimes
+        fusion_dim = 128 + 32 + num_regimes + num_change
 
         self.actor_layer = nn.Sequential(
             nn.Linear(fusion_dim, 256),
@@ -73,33 +78,32 @@ class Agent(nn.Module):
 
     def forward(self, micro_x:Tensor, macro_x:Tensor):
         # System 2
-        macro_feat, belief_logits = self.belief_head(macro_x)
+        macro_feat, belief_logits, change_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
+        current_change_probs = torch.sigmoid(change_logits, dim=1)
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()
         _, (h_n, _) = self.micro_lstm(micro_x)
         micro_feat = h_n[-1]
         # FUSION (context)
-        context = torch.cat([micro_feat, macro_feat, current_belief_probs], dim=1)
+        context = torch.cat([micro_feat, macro_feat, current_belief_probs, current_change_probs], dim=1)
         action_logits = self.actor_layer(context)
         value = self.critic(context)
-        return action_logits, value, belief_logits
+        return action_logits, value, belief_logits, change_logits
 
     def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int|None=None, mask_action:Tensor=None):
-        actor_logits, value, belief_logits = self.forward(micro_x, macro_x)
+        actor_logits, value, belief_logits, change_logits = self.forward(micro_x, macro_x)
         if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
         if action is None: action = probs.sample()
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
-        belief_probs = F.softmax(belief_logits, dim=1)
-        belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=1)
         #log_prob is the probability action
         #dist_entropy is the entropy Bonus
         #value is the value for critic
         #belief_probs is the probability for belief
         #belief_entropy
-        return action, log_prob, dist_entropy, value, belief_logits, belief_entropy
+        return action, log_prob, dist_entropy, value, belief_logits, change_logits
 
 # FocalLoss
 class FocalLoss(nn.Module):

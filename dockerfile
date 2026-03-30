@@ -12,9 +12,3 @@ COPY requirements.txt .
 RUN uv pip install --system -r requirements.txt
 
 COPY . .
-<<<<<<< HEAD
-=======
-
-# Un seul CMD par défaut
-CMD ["python3", "train_agent.py"]
->>>>>>> e79ba85 (update)

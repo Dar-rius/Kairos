@@ -37,7 +37,7 @@ def objective(trial):
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
-    belief_model.load_state_dict(torch.load("./agent/save/belief_head.pt", weights_only=True))
+    belief_model.load_state_dict(torch.load("./agent/save/macro_head.pt", weights_only=True))
     agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
     trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, device=DEVICE)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
