@@ -8,7 +8,4 @@ RUN pip install --force-reinstall numpy==1.26.4 wandb && \
 RUN pip uninstall numpy -y && \
     pip install numpy==1.26.4 --force-reinstall --no-binary :all:
 
-COPY requirements.txt .
-RUN uv pip install --system -r requirements.txt
-
 COPY . .

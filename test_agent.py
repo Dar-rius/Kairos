@@ -11,7 +11,7 @@ from tqdm import tqdm
 from kairos.compute import calcul_sharpe_ratio,max_dd
 
 # Config
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+DEVICE = "cpu"
 AGENT_PATH = './agent/save/agent_saved.pt'
 BELIEF_PATH = './agent/save/macro_head_1.pt'
 DATA_PATH = './data_off/train_test/'
@@ -35,7 +35,7 @@ print(f"Load model from {AGENT_PATH}...")
 print(f"Load model from {BELIEF_PATH}...")
 macro_head.load_state_dict(torch.load(BELIEF_PATH, weights_only=True, map_location=DEVICE))
 macro_head.eval()
-agent = Agent(STATE_DIM[0], ACTION_DIM, pretrained_model=macro_head).to(DEVICE)
+agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
 agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
 agent.eval()
 
@@ -57,7 +57,7 @@ for _ in tqdm(range(TEST_STEPS)):
     macro_obs = macro_obs.unsqueeze(0)
     with torch.no_grad():
         action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
-    next_obs, _, _, _, done = env.step(action_t)
+    next_obs, _, _, _, _, done = env.step(action_t)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()
     portfolio_history.append(current_val)
