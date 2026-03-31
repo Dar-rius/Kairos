@@ -80,7 +80,7 @@ class Agent(nn.Module):
         # System 2
         macro_feat, belief_logits, change_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
-        current_change_probs = torch.sigmoid(change_logits, dim=1)
+        current_change_probs = torch.sigmoid(change_logits)
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()
         _, (h_n, _) = self.micro_lstm(micro_x)

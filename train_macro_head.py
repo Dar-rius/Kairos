@@ -53,7 +53,7 @@ train_target_belief = pd.read_csv(f"{DATA_PATH}state_pretrain.csv").iloc[:, 1:]
 train_target_change = pd.read_csv(f"{DATA_PATH}change_pretrain.csv").iloc[:, 1:]
 MAT_CONF_PATH = "./runs/train_macro"
 MODEL_PATH = "./agent/save"
-LR = 0.0008
+LR = 0.003850091902319146
 EPOCHS = 30
 BATCH_SIZE = 64
 MACRO_DIM = train_feature_set.shape[1]
@@ -75,8 +75,8 @@ X = df_final[feature_cols].values.astype(np.float32)
 y_belief = df_final['regime'].values.astype(np.int64)
 y_change = df_final['change'].values.astype(np.int64)
 fold = 0
-weights_tensor_belief = torch.FloatTensor([1., 1.3, 3.])
-weights_tensor_change = torch.FloatTensor([ .78, 1.])
+weights_tensor_belief = torch.FloatTensor([1., 0.8835228721407905, 0.9362682099573649])
+weights_tensor_change = torch.FloatTensor([1., 0.981713583978431])
 
 for train_index, val_index in tscv.split(X):
     fold += 1
@@ -102,7 +102,7 @@ for train_index, val_index in tscv.split(X):
     criterion_change = FocalLoss(alpha=weights_tensor_change)
     model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
     #criterion = nn.CrossEntropyLoss(weight=weights_tensor)
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=6.734119081882703e-06)
     model.train()
     for epoch in range(EPOCHS):
         for batch_x, batch_y_belief, batch_y_change in train_loader:
