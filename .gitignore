@@ -10,3 +10,4 @@ db.sqlite3
 /train_macro/
 /wandb
 /run.sh
+/data_off
