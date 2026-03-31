@@ -48,7 +48,7 @@ def objective(trial):
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
-    for epoch in range(1, 300 + 1):
+    for epoch in range(1, 500 + 1):
         cumulative_reward = 0.0
         rewards_: deque[float] = deque()
         #btc_value: deque[float] = deque()
@@ -108,5 +108,5 @@ study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=50, n_jobs=2)
+study.optimize(objective, n_trials=400, n_jobs=10)
 print(study.best_params)

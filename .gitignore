@@ -11,3 +11,4 @@ db.sqlite3
 /wandb
 /run.sh
 /data_off
+/.nv_cache

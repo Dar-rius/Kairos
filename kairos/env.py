@@ -28,7 +28,6 @@ class Env():
             scaled_macro = self.macro_scaler.transform(macro_trade.values)
             self.hour_trade = torch.tensor(scaled_hour, dtype=torch.float32, device=self.device)
             self.macro_trade = torch.tensor(scaled_macro, dtype=torch.float32, device=self.device)
-            print(torch.isinf(self.macro_trade))
         # Total PnL [Buy Price, PnL Brut, Fees, PnL Final]
         self.total_pnl = torch.zeros((4,1), dtype=torch.float32, device=self.device)
         self.btc_value = torch.tensor([0], dtype=torch.float32, device=self.device)
