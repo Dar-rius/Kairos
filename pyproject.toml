@@ -9,11 +9,16 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "numpy<2",
+    "torch",
 ]
 
-[tool.hatch.build.targets.wheel]
+[tool.setuptools.packages.find]
 packages = ["kairos"]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu130"
+default = true
+
+#[build-system]
+#requires = ["setuptools>=61.0", "wheel"]
+#build-backend = "setuptools.build_meta"
