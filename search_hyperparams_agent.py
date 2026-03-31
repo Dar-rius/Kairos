@@ -17,11 +17,12 @@ DATA_PATH = './data_off/train_test/'
 def objective(trial):
 # Agent Hyperparam
     lr = trial.suggest_float("lr", 1e-6, 1e-3, log=True)
-    gamma = trial.suggest_float("gamma", 0.90, 0.99)
-    gae_lambda = trial.suggest_float("gae_lambda", 0.90, 0.99)
-    ent_coef = trial.suggest_float("ent_coef", 0.001, 0.1, log=True)
-    value_coef = trial.suggest_float("value_coef", 0.005, 0.5, log=True)
-    belief_coef = trial.suggest_float("belief_coef", 0.005, 0.5, log=True)
+    gamma = trial.suggest_float("gamma", 0.80, 0.99)
+    gae_lambda = trial.suggest_float("gae_lambda", 0.80, 0.99)
+    ent_coef = trial.suggest_float("ent_coef", 0.01, 0.9, log=True)
+    value_coef = trial.suggest_float("value_coef", 0.01, 0.9, log=True)
+    belief_coef = trial.suggest_float("belief_coef", 0.01, 0.9, log=True)
+    change_coef = trial.suggest_float("change_coef", 0.01, 0.9, log=True)
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
 # Load Data
@@ -29,24 +30,25 @@ def objective(trial):
     macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
     price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
     state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
+    change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
     
     TOTAL_TIMESTAMP = 2000000
     ROLLOUT_STEPS = 2048
 
-    env = Env(hour_df, macro_df, price_series, state_series, use_scaler=True, device=DEVICE)
+    env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
     belief_model.load_state_dict(torch.load("./agent/save/macro_head.pt", weights_only=True))
-    agent = Agent(STATE_DIM[0], action_dim=ACTION_DIM, pretrained_model=belief_model).to(DEVICE)
-    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, device=DEVICE)
+    agent = Agent(belief_model, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
+    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, change_coef=change_coef, device=DEVICE)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
-    for epoch in range(1, 100 + 1):
+    for epoch in range(1, 300 + 1):
         cumulative_reward = 0.0
         rewards_: deque[float] = deque()
         #btc_value: deque[float] = deque()
@@ -58,9 +60,9 @@ def objective(trial):
             macro_t = macro_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, _, value_t, _, belief_entropy = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                action_t, log_prob_t, _, value_t, _,  _ = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
-            next_obs, reward, target_regime, truncate, done = env.step(action_t)
+            next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
@@ -69,10 +71,11 @@ def objective(trial):
                 reward=reward,
                 value=value_t,
                 dones = 1.0 if done else 0.0,
-                target_regime=target_regime
+                target_regime=target_regime,
+                target_change=target_change
             )
             cumulative_reward += reward
-            rewards_.append(rewards_)
+            rewards_.append(reward)
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
             else:
@@ -105,5 +108,5 @@ study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=50, n_jobs=2)
 print(study.best_params)
