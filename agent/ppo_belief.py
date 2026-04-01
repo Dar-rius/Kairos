@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-f if torch.cuda.is_available() else "cpu"rom torch import Tensor
+from torch import Tensor
 from .buffer import Buffer
 from .model import Agent
 

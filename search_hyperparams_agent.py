@@ -19,10 +19,10 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-6, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.80, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.80, 0.99)
-    ent_coef = trial.suggest_float("ent_coef", 0.01, 0.9, log=True)
-    value_coef = trial.suggest_float("value_coef", 0.01, 0.9, log=True)
-    belief_coef = trial.suggest_float("belief_coef", 0.01, 0.9, log=True)
-    change_coef = trial.suggest_float("change_coef", 0.01, 0.9, log=True)
+    ent_coef = trial.suggest_float("ent_coef", 0.01, 0.9)
+    value_coef = trial.suggest_float("value_coef", 0.01, 0.9)
+    belief_coef = trial.suggest_float("belief_coef", 0.01, 0.9)
+    change_coef = trial.suggest_float("change_coef", 0.01, 0.9)
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
 # Load Data
@@ -48,7 +48,7 @@ def objective(trial):
     micro_obs, macro_obs = env.reset()
     global_step = 0
     # Training Loop
-    for epoch in range(1, 500 + 1):
+    for epoch in range(1, 400 + 1):
         cumulative_reward = 0.0
         rewards_: deque[float] = deque()
         #btc_value: deque[float] = deque()
@@ -95,7 +95,7 @@ def objective(trial):
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
         trainer.update(buffer, TOTAL_TIMESTAMP, step, batch_size)
-        # Clean buffer
+        # Clean buff5
         buffer.clear()
 
         # For optuna
@@ -108,5 +108,5 @@ study = optuna.create_study(direction = 'maximize',
                             storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=400, n_jobs=10)
+study.optimize(objective, n_trials=50, n_jobs=4)
 print(study.best_params)
