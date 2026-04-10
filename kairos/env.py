@@ -15,7 +15,7 @@ class Env():
     def __init__(self, hour_trade:pd.DataFrame, macro_trade:pd.DataFrame,
                  price:pd.Series, state_pred:pd.Series=None, change_pred:pd.Series=None,
                  amount_usd:float=100000.0, cost_rate:float=0.001,
-                 device:str='cpu', use_scaler:bool=False
+                 device:str='cpu', use_scaler:bool=False, dsr_eta:float=0.1, dsr_warmup:int=10
                  ):
         self.device = device
         self.init_usd_amount = amount_usd
@@ -43,7 +43,15 @@ class Env():
         self.observation_space = self.hour_trade.shape[1], self.macro_trade.shape[1]
         self.action_space = 3
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
-        self.prev_action = torch.tensor([0],dtype=torch.int32, device=self.device)
+        self.ema_a = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self.dsr_nu = torch.tensor(0.003, dtype=torch.float16, device=device)
+        self.step_ = 0
+
+    def _reset_dsr_stats(self):
+        self.ema_a.fill_(0.0)
+        self.ema_b.fill_(0.0)
+        self.step_ = 0
 
     def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
@@ -82,7 +90,7 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
-        self.prev_action.fill_(0)
+        self._reset_dsr_stats()
 
     def _next(self):
         self.time[1] += 1
@@ -105,7 +113,7 @@ class Env():
         macro_idx = int(min(self.time[0].item(), self.size - 1))
         price_idx = int(min(self.time[2].item(), self.price.shape[0] - 1))
         start = self.time[1].item()
-        end = self.time[2].item() + 1  
+        end = self.time[2].item() + 1
         daily_trades = self.hour_trade[start:end]
         macro_days = self.macro_trade[macro_idx]
         self.btc_value = self.price[price_idx]
@@ -143,8 +151,8 @@ class Env():
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
         #Compute the reward
-        reward = reward_func(return_, action, self.prev_action, self.cost_rate)
-        self.prev_action.fill_(action_int)
+        self.step_=+1
+        reward, self.ema_a, self.ema_b = reward_func(return_, self.step_, self.dsr_nu, self.ema_a, self.ema_b)
         done = self.time[2] == self.hour_trade.shape[0]
         truncate = self.calcul_portfolio_value() == 0
         return next_state, reward, state_pred, change_pred, truncate, done

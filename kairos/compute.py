@@ -5,16 +5,29 @@ import math
 import torch
 from torch import Tensor
 from collections import deque
-from math import *
 
-def reward_func(return_:Tensor, action: Tensor, prev_action:Tensor, fees:Tensor) -> float:
-    if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0
-    if action == 2: action = torch.tensor([-1], device=action.device)
-    gain = (action * return_) * 100
-    cost = fees * 100 * torch.abs(action - prev_action)
-    reward = gain - cost
-    final_reward = torch.clamp(reward, -10.0, 10.0)
-    return final_reward.item()
+def reward_func(return_:Tensor, step:int, dsr_nu:Tensor, ema_a:Tensor, ema_b:Tensor) -> tuple[float, Tensor, Tensor]:
+    if torch.isnan(return_).any() or torch.isinf(return_).any(): return -10.0, ema_a, ema_b
+    # Compute delta A and B
+    delta_a =  return_ - ema_a
+    delta_b =  (return_**2) - ema_b
+    # Compute A and B
+    new_ema_a = ema_a + (dsr_nu * delta_a)
+    new_ema_b = ema_b + (dsr_nu * delta_b)
+    # if step is less than 4
+    if step < 10: return torch.clamp(return_*100, -10.0, 10.0).item(), new_ema_a, new_ema_b
+    print(f'pass dsr in step {step}')
+    # Calcul du DSR
+    epsilon = 1e-8
+    variance = ema_b - (ema_a ** 2)
+    
+    # Calcul DSR
+    numerator = (ema_b * delta_a) - (0.5 * ema_a * delta_b)
+    denominator = torch.pow(torch.clamp(variance, min=0.0) + epsilon, 1.5)
+    
+    dsr = numerator / denominator
+    reward = torch.clamp(dsr * 100, -10.0, 10.0).item()
+    return reward, new_ema_a, new_ema_b
 
 #Compute the sharpe ration
 def calcul_sharpe_ratio(portfolio_value: list) -> float:

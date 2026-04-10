@@ -98,12 +98,14 @@ class Agent(nn.Module):
         if action is None: action = probs.sample()
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
+        belief_prob = torch.softmax(belief_logits, dim=-1)
+        change_prob = torch.sigmoid(change_logits)
         #log_prob is the probability action
         #dist_entropy is the entropy Bonus
         #value is the value for critic
         #belief_probs is the probability for belief
         #belief_entropy
-        return action, log_prob, dist_entropy, value, belief_logits, change_logits
+        return action, log_prob, dist_entropy, value, belief_logits, change_logits, belief_prob, change_prob
 
 # FocalLoss
 class FocalLoss(nn.Module):

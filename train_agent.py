@@ -10,8 +10,9 @@ import numpy as np
 import pandas as pd
 from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
+from visualizer import Visualizer
 
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+DEVICE = "cpu"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
@@ -20,13 +21,13 @@ wandb.login()
 
 # Agent Hyperparam
 LR = 3e-4
-GAMMA = 0.97
+GAMMA = 0.995
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.05
+ENT_COEF = 0.1
 VALUE_COEF = 0.3
-BELIEF_COEF = 0.2
-CHANGE_COEF = 0.2
+BELIEF_COEF = 0.4
+CHANGE_COEF = 0.3
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -35,11 +36,12 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 3000000
+TOTAL_TIMESTAMP = 6000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
+viz = Visualizer()
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
@@ -73,7 +75,7 @@ with wandb.init(project=project, config=config) as run:
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
         action_counts = {0: 0, 1: 0, 2: 0}
-        last_done = False
+        stop = False
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
             global_step += 1
@@ -81,11 +83,14 @@ with wandb.init(project=project, config=config) as run:
             macro_t = macro_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _ = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
+            portfolio_val = env.calcul_portfolio_value()
+            
             action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
+            
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
@@ -95,7 +100,9 @@ with wandb.init(project=project, config=config) as run:
                 value=value_t,
                 dones = done_casted,
                 target_regime=target_regime,
-                target_change=target_change
+                target_change=target_change,
+                beliefs = belief_probs.squeeze(0),
+                portfolio = portfolio_val
             )
             cumulative_reward += reward
             cumulative_pnl += env.get_pnl()
@@ -103,17 +110,17 @@ with wandb.init(project=project, config=config) as run:
             btc_value.append(env.btc_value.item())
             if done or truncate:
                 micro_obs, macro_obs = env.reset()
-                last_done = True
+                stop = True
             else:
                 micro_obs, macro_obs = next_obs
-        if last_done:
+        if stop:
             last_value = torch.tensor([0.0], device=DEVICE)
         else:
             # Optimisation phase
             with torch.inference_mode():
                 next_micro_t = micro_obs.unsqueeze(0)
                 next_macro_t = macro_obs.unsqueeze(0)
-                _, _, _, next_value, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
+                _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
@@ -124,10 +131,13 @@ with wandb.init(project=project, config=config) as run:
         rewards_list = buffer.rewards
         values_list = buffer.values
         dones_list = buffer.dones
-        returns, adv = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
+        returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
         loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        trainer.reset_aes()
+        #create scatter
+        scatter = viz.log_belief_scatter(buffer)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,
@@ -142,7 +152,8 @@ with wandb.init(project=project, config=config) as run:
                  'max drawn down': mdd,
                  'hold frenquency': hold_pct,
                  'buy frequency': buy_pct,
-                 'sell frequency':sell_pct})
+                 'sell frequency':sell_pct,
+                 'Belief Space 3D': scatter})
 
 #Save model
 if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)

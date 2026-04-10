@@ -31,8 +31,10 @@ class Buffer:
         self.rewards = torch.zeros((self.step), device=self.device)
         self.values = torch.zeros((self.step), device=self.device)
         self.dones = torch.zeros((self.step), device=self.device)
+        self.beliefs = torch.zeros((self.step, 3), device=self.device)
+        self.portfolio = torch.zeros((self.step), device=self.device)
 
-    def insert(self, micro_state:Tensor, macro_state:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor):
+    def insert(self, micro_state:Tensor, macro_state:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor, beliefs:Tensor, portfolio: Tensor):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
         self.actions[self.slice] = action
@@ -42,6 +44,8 @@ class Buffer:
         self.dones[self.slice] = dones
         self.target_regimes[self.slice] = target_regime
         self.target_changes[self.slice] = target_change
+        self.beliefs[self.slice] = beliefs
+        self.portfolio[self.slice] = portfolio
         self.slice += 1
 
     def insert_returns(self, returns:Tensor, adv:Tensor):
@@ -53,7 +57,8 @@ class Buffer:
         return (self.micro_states, self.macro_states,
                 self.actions, self.old_log_probs,
                 self.returns, self.adv, self.rewards,
-                self.values, self.dones, self.target_regimes, self.target_changes)
+                self.values, self.dones, self.target_regimes,
+                self.target_changes, self.beliefs, self.portfolio)
 
     # Delete all data
     def clear(self):

@@ -56,7 +56,7 @@ for _ in tqdm(range(TEST_STEPS)):
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
     with torch.no_grad():
-        action_t, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
+        action_t, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
     next_obs, _, _, _, _, done = env.step(action_t)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()
