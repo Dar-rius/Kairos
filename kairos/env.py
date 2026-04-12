@@ -151,7 +151,8 @@ class Env():
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
         #Compute the reward
-        self.step_=+1
+        self.step_+=1
+        print(self.step_)
         reward, self.ema_a, self.ema_b = reward_func(return_, self.step_, self.dsr_nu, self.ema_a, self.ema_b)
         done = self.time[2] == self.hour_trade.shape[0]
         truncate = self.calcul_portfolio_value() == 0
