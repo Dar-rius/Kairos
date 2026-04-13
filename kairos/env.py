@@ -19,6 +19,10 @@ class Env():
                  ):
         self.device = device
         self.init_usd_amount = amount_usd
+        self.position_type = torch.tensor([0], dtype=torch.int8, device=self.device) 
+        self.entry_price = torch.tensor(0.0, dtype=torch.float32, device=self.device)
+        self.position_size_usd = torch.tensor(0.0, dtype=torch.float32, device=self.device)
+        self.cash = torch.tensor(self.init_usd_amount, dtype=torch.float32, device=self.device)
         self.use_scaler = use_scaler
         if self.use_scaler:
             # Normalized all dataset
@@ -36,7 +40,6 @@ class Env():
         self.price = torch.tensor(price.values, dtype=torch.float32, device=self.device)
         # Time for trades [Day, Start Hour, Last Hour]
         self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
-        self.total_amount = torch.tensor([self.init_usd_amount, 0.0], dtype=torch.float32, device=self.device)
         self.cost_rate = torch.tensor(cost_rate, device=self.device)
         self.size = self.macro_trade.shape[0]
         self.seq = torch.tensor(24, device=self.device)
@@ -53,26 +56,38 @@ class Env():
         self.ema_b.fill_(0.0)
         self.step_ = 0
 
+    def _change_pos_state(self, pos_usd:float=0.0, pos:int=0, entry_val:float=0.0, cash:float=0.0):
+        self.position_size_usd.fill_(pos_usd)
+        self.entry_price.fill_(entry_val)
+        self.position_type.fill_(pos)
+        self.cash.fill_(cash)
+
     def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
         self.p_values_return[1] = self.calcul_portfolio_value()
 
     def _buy(self):
-        cost_fees = calcul_cost(self.total_amount[0], self.cost_rate)
-        usd_price = self.total_amount[0] - cost_fees
-        self.total_amount[1] = convert_to_btc(usd_price, self.btc_value)
-        self.total_pnl[0] = self.total_amount[0]
-        self.total_pnl[2] = cost_fees
-        self.total_amount[0] = 0
+        cost_fees = calcul_cost(self.cash, self.cost_rate)
+        res = self.cash - cost_fees
+        self._change_pos_state(res, 1, self.btc_value)
 
     def _sell(self):
-        usd_price = convert_to_usd(self.total_amount[1], self.btc_value)
-        cost_fees = calcul_cost(usd_price, self.cost_rate)
-        self.total_amount[0] = usd_price - cost_fees
-        self.total_pnl[2] += cost_fees
-        self.total_pnl[1] = usd_price - self.total_pnl[0]
-        self.total_pnl[3] = profit_and_loss(self.total_pnl)
-        self.total_amount[1] = 0
+        current_value = self.position_size_usd * (self.btc_value / self.entry_price)
+        cost_fees = current_value * self.cost_rate
+        cash = current_value - cost_fees
+        self._change_pos_state(cash=cash)
+
+    def _short(self):
+        cost_fees = calcul_cost(self.cash, self.cost_rate)
+        res = self.cash - cost_fees
+        self._change_pos_state(res, -1, self.btc_value)
+
+    def _cover(self):
+        current_value = self.position_size_usd * (2.0 - (self.btc_value / self.entry_price))
+        current_value = torch.clamp(current_value, min=0.0)
+        cost_fees = current_value * self.cost_rate
+        cash = current_value - cost_fees
+        self._change_pos_state(cash=cash)
 
     def _all_reset(self, train:bool=True):
         if train:
@@ -83,14 +98,14 @@ class Env():
             micro_start = random_day * 24
             micro_end = micro_start + 23
             self.time = torch.tensor([random_day, micro_start, micro_end], dtype=torch.int32, device=self.device)
-        else: self.time = torch.tensor([0, 0, 23])
+        else: self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
         self.seq.fill_(0)
         # Reset Portfolio Value
-        self.total_amount = torch.tensor([self.init_usd_amount, 0.0], dtype=torch.float32, device=self.device)
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
         self._reset_dsr_stats()
+        self._change_pos_state()
 
     def _next(self):
         self.time[1] += 1
@@ -106,10 +121,16 @@ class Env():
         return pnl.item()
 
     def calcul_portfolio_value(self) -> Tensor:
-        return self.total_amount[0] if self.total_amount[0] > 0.0 else convert_to_usd(self.total_amount[1], self.btc_value)
+        if self.position_type == 1:
+            val = self.position_size_usd * (self.btc_value - self.entry_price)
+            return self.cash + val
+        elif self.position_type == -1:
+            val = self.position_size_usd * (2.0 - (self.btc_value - self.entry_price))
+            return self.cash + val
+        return self.cash
 
     # Create a group state
-    def new_state(self) -> tuple[Tensor, Tensor]:
+    def new_state(self) -> tuple[Tensor, Tensor, Tensor]:
         macro_idx = int(min(self.time[0].item(), self.size - 1))
         price_idx = int(min(self.time[2].item(), self.price.shape[0] - 1))
         start = self.time[1].item()
@@ -117,24 +138,24 @@ class Env():
         daily_trades = self.hour_trade[start:end]
         macro_days = self.macro_trade[macro_idx]
         self.btc_value = self.price[price_idx]
-        return daily_trades, macro_days
+        return daily_trades, macro_days, self.position_type
 
     # mask actions
     def get_action_mask(self) -> Tensor:
         mask = [True, True, True]
-        if self.total_amount[1] < 1e-8: mask[2] = False
-        else: mask[1] = False
+        if self.position_type == 1: mask[1] = False
+        elif self.position_type == -1: mask[2] = False
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
     # Reset the env to 0
-    def reset(self, train:bool=True) -> tuple[Tensor, Tensor]:
+    def reset(self, train:bool=True) -> tuple[Tensor, Tensor, Tensor]:
         self._all_reset(train)
         macro_idx = int(self.time[0].item())
         price_idx = int(self.time[2].item())
         self.btc_value = self.price[price_idx]
         daily_trades = self.hour_trade[self.time[1]:self.time[2]+1]  # +1 pour avoir 24h
         macro_days = self.macro_trade[macro_idx]
-        return daily_trades, macro_days
+        return daily_trades, macro_days, self.position_type
 
     # The next step of env
     def step(self, action:Tensor) -> Any:
@@ -143,17 +164,23 @@ class Env():
         change_pred = self.change_pred[future_idx] if self.change_pred is not None else None
         action_int = action.item()
         # Buy
-        if action_int == 1: self._buy()
-        # Sell
-        elif action_int == 2: self._sell()
+        if action_int == 1:
+            if self.position_type == 0: self._buy()
+            elif self.position_type == -1: self._cover()
+        # Short and Sell
+        elif action_int == 2:
+            if self.position_type == 0: self._sell()
+            elif self.position_type == 1: self._short()
         self._next()
         next_state = self.new_state()
         self._update_p_values()
         return_ = return_log(self.p_values_return, self.device)
+        #Margin call (Liquidation)
+        current_cap = self.calcul_portfolio_value()
+        is_liquidated = current_cap <= (self.init_usd_amount * .05)
         #Compute the reward
         self.step_+=1
-        print(self.step_)
         reward, self.ema_a, self.ema_b = reward_func(return_, self.step_, self.dsr_nu, self.ema_a, self.ema_b)
         done = self.time[2] == self.hour_trade.shape[0]
-        truncate = self.calcul_portfolio_value() == 0
+        truncate = self.calcul_portfolio_value() == 0 or is_liquidated
         return next_state, reward, state_pred, change_pred, truncate, done

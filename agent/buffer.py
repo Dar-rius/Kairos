@@ -22,6 +22,7 @@ class Buffer:
         self.device = device
         self.micro_states = torch.zeros((self.step, 24, micro_size), device=self.device)
         self.macro_states = torch.zeros((self.step, macro_size), device=self.device)
+        self.pos_type = torch.zeros((self.step, 1), dtype=torch.long, device=self.device)
         self.actions = torch.zeros((self.step), dtype=torch.long, device=self.device)
         self.old_log_probs = torch.zeros((self.step), device=self.device)
         self.returns = torch.zeros((self.step), device=self.device)
@@ -34,9 +35,10 @@ class Buffer:
         self.beliefs = torch.zeros((self.step, 3), device=self.device)
         self.portfolio = torch.zeros((self.step), device=self.device)
 
-    def insert(self, micro_state:Tensor, macro_state:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor, beliefs:Tensor, portfolio: Tensor):
+    def insert(self, micro_state:Tensor, macro_state:Tensor, pos_type:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor, beliefs:Tensor, portfolio: Tensor):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
+        self.pos_type[self.slice] = pos_type
         self.actions[self.slice] = action
         self.old_log_probs[self.slice] = old_log_prob
         self.rewards[self.slice] = reward
@@ -55,7 +57,7 @@ class Buffer:
     # sampling data
     def get_all(self) -> tuple:
         return (self.micro_states, self.macro_states,
-                self.actions, self.old_log_probs,
+                self.pos_type, self.actions, self.old_log_probs,
                 self.returns, self.adv, self.rewards,
                 self.values, self.dones, self.target_regimes,
                 self.target_changes, self.beliefs, self.portfolio)

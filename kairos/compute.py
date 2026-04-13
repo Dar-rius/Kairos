@@ -16,7 +16,6 @@ def reward_func(return_:Tensor, step:int, dsr_nu:Tensor, ema_a:Tensor, ema_b:Ten
     new_ema_b = ema_b + (dsr_nu * delta_b)
     # if step is less than 4
     if step < 10: return torch.clamp(return_*100, -10.0, 10.0).item(), new_ema_a, new_ema_b
-    print(f'pass dsr in step {step}')
     # Calcul du DSR
     epsilon = 1e-8
     variance = ema_b - (ema_a ** 2)

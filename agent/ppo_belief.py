@@ -64,7 +64,7 @@ class PPOTrainer:
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
         self.lr_decay(self.lr, total_steps, step)
         # the target regime (0 -> Stable, 1 -> Volatility, 2 -> Crisis)
-        micro_states, macro_states, actions, old_log_probs, returns, adv, _, _, _, target_regimes, target_changes, _, _ = memory.get_all()
+        micro_states, macro_states, pos_type, actions, old_log_probs, returns, adv, _, _, _, target_regimes, target_changes, _, _ = memory.get_all()
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
@@ -75,7 +75,7 @@ class PPOTrainer:
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _= self.model.get_action_and_value(micro_states[idx], macro_states[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _= self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
                 with torch.no_grad():
                     vals = new_values.flatten()
                     delta_proxy = returns[idx].flatten() - vals

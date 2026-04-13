@@ -48,7 +48,7 @@ class Agent(nn.Module):
         
         # --- FUSION HIÉRARCHIQUE ---
         # 128 (Micro) + 32 (Macro Context) + 3 (Macro Explicit Prediction)
-        fusion_dim = 128 + 32 + num_regimes + num_change
+        fusion_dim = 128 + 32 + num_regimes + num_change + 1
 
         self.actor_layer = nn.Sequential(
             nn.Linear(fusion_dim, 256),
@@ -76,7 +76,7 @@ class Agent(nn.Module):
         nn.init.orthogonal_(actor_out.weight, gain=0.01)
         nn.init.constant_(actor_out.bias, 0.0)
 
-    def forward(self, micro_x:Tensor, macro_x:Tensor):
+    def forward(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor):
         # System 2
         macro_feat, belief_logits, change_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
@@ -86,13 +86,13 @@ class Agent(nn.Module):
         _, (h_n, _) = self.micro_lstm(micro_x)
         micro_feat = h_n[-1]
         # FUSION (context)
-        context = torch.cat([micro_feat, macro_feat, current_belief_probs, current_change_probs], dim=1)
+        context = torch.cat([micro_feat, macro_feat, current_belief_probs, current_change_probs, pos_type], dim=1)
         action_logits = self.actor_layer(context)
         value = self.critic(context)
         return action_logits, value, belief_logits, change_logits
 
-    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, action:int|None=None, mask_action:Tensor=None):
-        actor_logits, value, belief_logits, change_logits = self.forward(micro_x, macro_x)
+    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor, action:int|None=None, mask_action:Tensor=None):
+        actor_logits, value, belief_logits, change_logits = self.forward(micro_x, macro_x, pos_type)
         if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
         if action is None: action = probs.sample()

@@ -20,7 +20,7 @@ GRAPH_PATH = "./runs/test"
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
-usd_amount = 100000.0
+usd_amount = 10000.0
 
 # Initialization
 env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
@@ -40,7 +40,7 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval()
 
 print("Run the Backtest...")
-micro_obs, macro_obs = env.reset(train=True)
+micro_obs, macro_obs = env.reset(train=False)
 
 # Tracking
 portfolio_history : deque[float] = deque()

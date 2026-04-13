@@ -36,7 +36,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 7000000
+TOTAL_TIMESTAMP = 6000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -65,7 +65,7 @@ config = {
         }
 
 # Run env
-micro_obs, macro_obs = env.reset()
+micro_obs, macro_obs, pos_obs = env.reset()
 global_step = 0
 # Training Loop
 with wandb.init(project=project, config=config) as run:
@@ -81,9 +81,10 @@ with wandb.init(project=project, config=config) as run:
             global_step += 1
             micro_t = micro_obs.unsqueeze(0)
             macro_t = macro_obs.unsqueeze(0)
+            pos_t = pos_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _ = agent.get_action_and_value(micro_t, macro_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, mask_action=action_masked)
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             portfolio_val = env.calcul_portfolio_value()
@@ -94,6 +95,7 @@ with wandb.init(project=project, config=config) as run:
             buffer.insert(
                 micro_state=micro_t,
                 macro_state=macro_t,
+                pos_type=pos_t,
                 action=action_t,
                 old_log_prob=log_prob_t,
                 reward=reward,
@@ -109,10 +111,10 @@ with wandb.init(project=project, config=config) as run:
             portfolio_value.append(env.calcul_portfolio_value().item())
             btc_value.append(env.btc_value.item())
             if done or truncate:
-                micro_obs, macro_obs = env.reset()
+                micro_obs, macro_obs, pos_obs = env.reset()
                 stop = True
             else:
-                micro_obs, macro_obs = next_obs
+                micro_obs, macro_obs, pos_obs = next_obs
         if stop:
             last_value = torch.tensor([0.0], device=DEVICE)
         else:
@@ -120,7 +122,8 @@ with wandb.init(project=project, config=config) as run:
             with torch.inference_mode():
                 next_micro_t = micro_obs.unsqueeze(0)
                 next_macro_t = macro_obs.unsqueeze(0)
-                _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, mask_action=action_masked)
+                pos_t = pos_obs.unsqueeze(0)
+                _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
