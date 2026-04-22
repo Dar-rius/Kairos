@@ -14,3 +14,4 @@ db.sqlite3
 /.nv_cache
 /diagrams
 /check_flows.py
+/gen_static.sh
