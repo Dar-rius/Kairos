@@ -12,3 +12,5 @@ db.sqlite3
 /run.sh
 /data_off
 /.nv_cache
+/diagrams
+/check_flows.py

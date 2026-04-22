@@ -22,7 +22,7 @@ class Buffer:
         self.device = device
         self.micro_states = torch.zeros((self.step, 24, micro_size), device=self.device)
         self.macro_states = torch.zeros((self.step, macro_size), device=self.device)
-        self.pos_type = torch.zeros((self.step, 1), dtype=torch.long, device=self.device)
+        self.pos_type = torch.zeros((self.step, 1), device=self.device)
         self.actions = torch.zeros((self.step), dtype=torch.long, device=self.device)
         self.old_log_probs = torch.zeros((self.step), device=self.device)
         self.returns = torch.zeros((self.step), device=self.device)

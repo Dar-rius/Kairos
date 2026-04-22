@@ -181,7 +181,6 @@ class Visualizer:
         if scatter_3d:
             logs['belief_space_3d'] = scatter_3d
         
-        
         # Timeline
         timeline = self.log_portfolio_timeline(buffer)
         if timeline:

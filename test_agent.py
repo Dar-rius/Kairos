@@ -40,7 +40,7 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval()
 
 print("Run the Backtest...")
-micro_obs, macro_obs = env.reset(train=False)
+micro_obs, macro_obs, pos_obs = env.reset(train=False)
 
 # Tracking
 portfolio_history : deque[float] = deque()
@@ -55,8 +55,9 @@ for _ in tqdm(range(TEST_STEPS)):
     action_mask = env.get_action_mask()
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
+    pos_obs = pos_obs.unsqueeze(0)
     with torch.no_grad():
-        action_t, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, mask_action=action_mask)
+        action_t, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
     next_obs, _, _, _, _, done = env.step(action_t)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()
@@ -77,7 +78,7 @@ for _ in tqdm(range(TEST_STEPS)):
         mdd.append(max_dd(portfolio_history))
         copy_portfolio.clear()
     if done: break
-    micro_obs, macro_obs = next_obs
+    micro_obs, macro_obs , pos_obs = next_obs
 
 results_df = pd.DataFrame({
     'portfolio_value': portfolio_history,
