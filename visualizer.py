@@ -10,8 +10,8 @@ import torch
 
 class Visualizer:
     def __init__(self):
-        self.colors = {0: '#3498db', 1: '#2ecc71', 2: '#e74c3c'}
-        self.labels = {0: 'Hold', 1: 'Buy', 2: 'Sell'}
+        self.colors = {0: '#3498db', 1: '#2ecc71', 2: '#e74c3c', 3: '#180501'}
+        self.labels = {0: 'Hold', 1: 'Buy', 2: 'Sell', 3: 'Short'}
     
     def log_belief_scatter(self, buffer):
         """
@@ -49,8 +49,9 @@ class Visualizer:
         
         # Normalisation des tailles pour plotly (5 à 50)
         p_min, p_max = portfolio.min(), portfolio.max()
+        portfolio_clean = np.nan_to_num(portfolio, nan=p_min, posinf=p_max, neginf=p_min)
         if p_max > p_min:
-            sizes = 5 + 45 * (portfolio - p_min) / (p_max - p_min)
+            sizes = sizes = 5 + 45 * (portfolio_clean - p_min) / (p_max - p_min)
         else:
             sizes = np.full_like(portfolio, 20)
         
@@ -67,7 +68,8 @@ class Visualizer:
             color_discrete_map={
                 'Hold': self.colors[0],
                 'Buy': self.colors[1],
-                'Sell': self.colors[2]
+                'Sell': self.colors[2],
+                'Short': self.colors[3]
             },
             labels={
                 'x': 'P(Bull)',

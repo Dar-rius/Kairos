@@ -74,7 +74,7 @@ with wandb.init(project=project, config=config) as run:
         cumulative_pnl = 0.0
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
-        pos_counts = {-1: 0, 0: 0, 1: 0}
+        action_counts = {0: 0, 1: 0, 2: 0, 3: 0}
         stop = False
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
@@ -89,7 +89,7 @@ with wandb.init(project=project, config=config) as run:
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             portfolio_val = env.calcul_portfolio_value()
             
-            pos_counts[int(pos_t)] += 1
+            action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
             
             buffer.insert(
@@ -126,9 +126,10 @@ with wandb.init(project=project, config=config) as run:
                 _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
-        short_pct = (pos_counts[-1] / ROLLOUT_STEPS) * 100
-        hold_pct = (pos_counts[0] / ROLLOUT_STEPS) * 100
-        buy_pct = (pos_counts[1] / ROLLOUT_STEPS) * 100
+        hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
+        buy_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
+        sell_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
+        short_pct = (action_counts[3] / ROLLOUT_STEPS) * 100
         sharpe =  calcul_sharpe_ratio(list(portfolio_value))
         mdd = max_dd(portfolio_value)
         rewards_list = buffer.rewards
@@ -155,6 +156,7 @@ with wandb.init(project=project, config=config) as run:
                  'max drawn down': mdd,
                  'hold frenquency': hold_pct,
                  'buy frequency': buy_pct,
+                 'sell frequency': sell_pct,
                  'short frequency':short_pct,
                  'Belief Space 3D': scatter})
 
