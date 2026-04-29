@@ -126,6 +126,9 @@ class Env():
         self.total_pnl.fill_(0.0)
         self.btc_value.fill_(0.0)
         self.past_position.fill_(0)
+        self.cash.fill_(self.init_usd_amount)
+        self.btc_held.fill_(0.0)
+        self.btc_shorted.fill_(0.0)
         self._reset_dsr_stats()
 
     def _next(self):
@@ -159,8 +162,8 @@ class Env():
     def get_action_mask(self) -> Tensor:
         mask = [True, True, True, True]
         if self.cash < 1e-8: mask[1] = False
-        elif self.btc_shorted > 1e-8: mask[3] = False
-        elif self.btc_held < 1e-8: mask[2] = False
+        if self.btc_shorted > 1e-8: mask[3] = False
+        if self.btc_held < 1e-8: mask[2] = False
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1,-1)
 
     # Reset the env to 0
