@@ -10,8 +10,8 @@ import torch
 
 class Visualizer:
     def __init__(self):
-        self.colors = {0: '#3498db', 1: '#2ecc71', 2: '#e74c3c', 3: '#180501'}
-        self.labels = {0: 'Hold', 1: 'Buy', 2: 'Sell', 3: 'Short'}
+        self.colors = {0: '#e74c3c', 1: '#2ecc71', 2: '#3498db'}
+        self.labels = {0: 'Short', 1: 'Hold', 2: 'Buy'}
     
     def log_belief_scatter(self, buffer):
         """
@@ -68,8 +68,7 @@ class Visualizer:
             color_discrete_map={
                 'Hold': self.colors[0],
                 'Buy': self.colors[1],
-                'Sell': self.colors[2],
-                'Short': self.colors[3]
+                'Short': self.colors[2]
             },
             labels={
                 'x': 'P(Bull)',
@@ -97,8 +96,6 @@ class Visualizer:
         )
         
         return wandb.Html(fig.to_html(full_html=False, include_plotlyjs='cdn'))
-    
-    
     
     def log_portfolio_timeline(self, buffer):
         """Timeline portfolio avec zones d'action"""

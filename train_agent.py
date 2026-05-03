@@ -20,14 +20,14 @@ print(f"Training on: {DEVICE}")
 wandb.login()
 
 # Agent Hyperparam
-LR = 3e-4
+LR = 3e-5
 GAMMA = 0.995
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENT_COEF = 0.1
+ENT_COEF = 0.4
 VALUE_COEF = 0.3
-BELIEF_COEF = 0.4
-CHANGE_COEF = 0.3
+BELIEF_COEF = 0.2
+CHANGE_COEF = 0.1
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -36,7 +36,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 1000000
+TOTAL_TIMESTAMP = 3000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -74,7 +74,7 @@ with wandb.init(project=project, config=config) as run:
         cumulative_pnl = 0.0
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
-        action_counts = {0: 0, 1: 0, 2: 0, 3: 0}
+        action_counts = {0: 0, 1: 0, 2: 0}
         stop = False
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
@@ -88,7 +88,6 @@ with wandb.init(project=project, config=config) as run:
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             portfolio_val = env.calcul_portfolio_value()
-            
             action_counts[int(action_t)] += 1
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
             
@@ -126,10 +125,9 @@ with wandb.init(project=project, config=config) as run:
                 _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
-        hold_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
-        buy_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
-        sell_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
-        short_pct = (action_counts[3] / ROLLOUT_STEPS) * 100
+        short_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
+        hold_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
+        buy_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
         sharpe =  calcul_sharpe_ratio(list(portfolio_value))
         mdd = max_dd(portfolio_value)
         rewards_list = buffer.rewards
@@ -156,7 +154,6 @@ with wandb.init(project=project, config=config) as run:
                  'max drawn down': mdd,
                  'hold frenquency': hold_pct,
                  'buy frequency': buy_pct,
-                 'sell frequency': sell_pct,
                  'short frequency':short_pct,
                  'Belief Space 3D': scatter})
 

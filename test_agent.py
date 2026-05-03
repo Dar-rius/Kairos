@@ -40,7 +40,7 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval()
 
 print("Run the Backtest...")
-micro_obs, macro_obs, pos_obs = env.reset(train=False)
+micro_obs, macro_obs, pos_obs = env.reset(train=True)
 
 # Tracking
 portfolio_history : deque[float] = deque()
@@ -92,11 +92,11 @@ plt.figure(figsize=(15, 10))
 # Sub-graph 1: Price BTC and Actions
 plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
-buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
-sell_idx = [i for i, x in enumerate(actions_history) if x == 2]
+buy_idx = [i for i, x in enumerate(actions_history) if x == 2]
+short_idx = [i for i, x in enumerate(actions_history) if x == 0]
 # Display the actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
-plt.scatter(sell_idx, [price_history[i] for i in sell_idx], marker='v', color='red', label='Sell', s=50)
+plt.scatter(short_idx, [price_history[i] for i in short_idx], marker='v', color='red', label='Short', s=50)
 plt.title('Trading Strategy (Price BTC)')
 plt.legend()
 plt.grid(True)
