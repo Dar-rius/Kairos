@@ -99,7 +99,7 @@ class PPOTrainer:
                        (self.value_coef * value_loss) + \
                        (self.belief_coef * belief_loss) + \
                        (self.change_coef * change_loss) - \
-                       (lambda_t * entropy_loss)
+                       (self.ent_coef * entropy_loss)
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()

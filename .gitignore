@@ -10,8 +10,8 @@ db.sqlite3
 /train_macro/
 /wandb
 /run.sh
-/data_off
 /.nv_cache
 /diagrams
 /check_flows.py
 /gen_static.sh
+/data_off/
