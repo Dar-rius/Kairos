@@ -65,6 +65,7 @@ for _ in tqdm(range(TEST_STEPS)):
     portfolio_history.append(current_val)
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price)
+    action_t -= 1
     if action_t.item() == past_action:
         actions_history.append(0)
     else:
@@ -97,7 +98,7 @@ plt.figure(figsize=(15, 10))
 plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
 buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
-short_idx = [i for i, x in enumerate(actions_history) if x == 2]
+short_idx = [i for i, x in enumerate(actions_history) if x == -1]
 # Display the actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
 plt.scatter(short_idx, [price_history[i] for i in short_idx], marker='v', color='red', label='Short', s=50)
