@@ -50,6 +50,7 @@ pnl_history : deque[float] = deque()
 sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
 done = False
+past_action = 0
 
 for _ in tqdm(range(TEST_STEPS)):
     action_mask = env.get_action_mask()
@@ -64,7 +65,11 @@ for _ in tqdm(range(TEST_STEPS)):
     portfolio_history.append(current_val)
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price)
-    actions_history.append(action_t.item())
+    if action_t.item() == past_action:
+        actions_history.append(0)
+    else:
+        actions_history.append(action_t.item())
+    past_action = action_t.item()
     pnl_history.append(env.get_pnl())
     n_days += 1
     if n_days % 365 == 0 or n_days == TEST_STEPS:
@@ -86,14 +91,13 @@ results_df = pd.DataFrame({
 })
 # Display last history value
 print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpes} \nMax Drawd Down: {mdd}")
-
 # Plot all historic Bloc
 plt.figure(figsize=(15, 10))
 # Sub-graph 1: Price BTC and Actions
 plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
-buy_idx = [i for i, x in enumerate(actions_history) if x == 2]
-short_idx = [i for i, x in enumerate(actions_history) if x == 0]
+buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
+short_idx = [i for i, x in enumerate(actions_history) if x == 2]
 # Display the actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
 plt.scatter(short_idx, [price_history[i] for i in short_idx], marker='v', color='red', label='Short', s=50)
