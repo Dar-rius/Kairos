@@ -173,7 +173,6 @@ class Env():
         else:
             self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
             self.day_total = self.size
-        print(self.day_total)
         self.seq.fill_(0)
         # Reset Portfolio Value
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)

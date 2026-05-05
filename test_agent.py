@@ -20,7 +20,7 @@ GRAPH_PATH = "./runs/test"
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
-usd_amount = 100000.0
+usd_amount = 10000.0
 
 # Initialization
 env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
@@ -45,13 +45,13 @@ micro_obs, macro_obs, pos_obs = env.reset(train=False)
 portfolio_history : deque[float] = deque()
 price_history : deque[float] = deque()
 actions_history : deque[int] = deque()
-pnl_history : deque[float] = deque()
 sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
-done = False
+pnl_history : deque[float] = deque()
 past_action = 0
 
-for _ in tqdm(range(env.day_total)):
+
+for t in tqdm(range(hour_df.shape[0])):
     action_mask = env.get_action_mask()
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
@@ -71,14 +71,13 @@ for _ in tqdm(range(env.day_total)):
         actions_history.append(action_t.item())
         past_action = action_t.item()
     pnl_history.append(env.get_pnl())
-    n_days += 1
-    if n_days % 365 == 0 or n_days == env.day_total:
+    if  t % 8760 == 0:
         portfolio_s = pd.Series(copy_portfolio)
         returns = portfolio_s.pct_change().dropna()
         if returns.std() == 0.0:
             sharpes.append(0.0)
         else:
-            sharpe = (returns.mean() / returns.std()) * np.sqrt(n_days * 24)
+            sharpe = (returns.mean() / returns.std()) * np.sqrt(8760)
             sharpes.append(sharpe.item())
         mdd.append(max_dd(portfolio_history))
         copy_portfolio.clear()
