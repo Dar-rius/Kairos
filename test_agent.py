@@ -20,7 +20,7 @@ GRAPH_PATH = "./runs/test"
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
-usd_amount = 10000.0
+usd_amount = 100000.0
 
 # Initialization
 env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
@@ -39,7 +39,7 @@ agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEV
 agent.eval()
 
 print("Run the Backtest...")
-micro_obs, macro_obs, pos_obs = env.reset(train=True)
+micro_obs, macro_obs, pos_obs = env.reset(train=False)
 
 # Tracking
 portfolio_history : deque[float] = deque()
@@ -65,11 +65,11 @@ for _ in tqdm(range(env.day_total)):
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price)
     action_t -= 1
-    if action_t.item() == past_action:
+    if action_t.item() == past_action or action_t == 0:
         actions_history.append(0)
     else:
         actions_history.append(action_t.item())
-    past_action = action_t.item()
+        past_action = action_t.item()
     pnl_history.append(env.get_pnl())
     n_days += 1
     if n_days % 365 == 0 or n_days == env.day_total:
@@ -78,7 +78,7 @@ for _ in tqdm(range(env.day_total)):
         if returns.std() == 0.0:
             sharpes.append(0.0)
         else:
-            sharpe = (returns.mean() / returns.std()) * np.sqrt(365 * 24)
+            sharpe = (returns.mean() / returns.std()) * np.sqrt(n_days * 24)
             sharpes.append(sharpe.item())
         mdd.append(max_dd(portfolio_history))
         copy_portfolio.clear()
