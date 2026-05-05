@@ -72,6 +72,7 @@ with wandb.init(project=project, config=config) as run:
     for update in tqdm(range(1, NUM_UPDATE + 1)):
         cumulative_reward = 0.0
         cumulative_pnl = 0.0
+        past_action = 0
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
         action_counts = {0: 0, 1: 0, 2: 0}
@@ -88,7 +89,11 @@ with wandb.init(project=project, config=config) as run:
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             portfolio_val = env.calcul_portfolio_value()
-            action_counts[int(action_t)] += 1
+            if past_action == action_t:
+                action_counts[1] += 1
+            else:
+                action_counts[int(action_t)] += 1
+            past_action = action_t
             done_casted = torch.tensor(1.0) if done else torch.tensor(0.0)
             
             buffer.insert(

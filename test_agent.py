@@ -16,7 +16,7 @@ AGENT_PATH = './agent/save/agent_saved.pt'
 BELIEF_PATH = './agent/save/macro_head_1.pt'
 DATA_PATH = './data_off/train_test/'
 GRAPH_PATH = "./runs/test"
-# DataFrame 
+# DataFrame
 hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
 macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
@@ -24,7 +24,6 @@ usd_amount = 10000.0
 
 # Initialization
 env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
-TEST_STEPS = macro_df.shape[0]
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 n_days = 0
@@ -52,7 +51,7 @@ mdd : deque[float] = deque()
 done = False
 past_action = 0
 
-for _ in tqdm(range(TEST_STEPS)):
+for _ in tqdm(range(env.day_total)):
     action_mask = env.get_action_mask()
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
@@ -73,7 +72,7 @@ for _ in tqdm(range(TEST_STEPS)):
     past_action = action_t.item()
     pnl_history.append(env.get_pnl())
     n_days += 1
-    if n_days % 365 == 0 or n_days == TEST_STEPS:
+    if n_days % 365 == 0 or n_days == env.day_total:
         portfolio_s = pd.Series(copy_portfolio)
         returns = portfolio_s.pct_change().dropna()
         if returns.std() == 0.0:

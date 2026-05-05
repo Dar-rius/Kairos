@@ -50,6 +50,7 @@ class Env():
         self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
         self.dsr_nu = torch.tensor(0.003, dtype=torch.float16, device=device)
         self.step_ = 0
+        self.day_total = 0
 
     def _reset_dsr_stats(self):
         self.ema_a.fill_(0.0)
@@ -168,7 +169,11 @@ class Env():
             micro_start = random_day * 24
             micro_end = micro_start + 23
             self.time = torch.tensor([random_day, micro_start, micro_end], dtype=torch.int32, device=self.device)
-        else: self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
+            self.day_total = self.size - int(self.time[0].item())
+        else:
+            self.time = torch.tensor([0, 0, 23], dtype=torch.int32, device=self.device)
+            self.day_total = self.size
+        print(self.day_total)
         self.seq.fill_(0)
         # Reset Portfolio Value
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)

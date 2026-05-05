@@ -10,7 +10,7 @@ import torch
 
 class Visualizer:
     def __init__(self):
-        self.colors = {0: '#e74c3c', 1: '#2ecc71', 2: '#3498db'}
+        self.colors = {0: '#e74c3c', 1: '#3498db', 2: '#2ecc71'}
         self.labels = {0: 'Short', 1: 'Hold', 2: 'Buy'}
     
     def log_belief_scatter(self, buffer):
