@@ -9,7 +9,7 @@ from collections import deque
 def reward_func(return_:Tensor, step:int, dsr_nu:Tensor, ema_a:Tensor, ema_b:Tensor) -> tuple[float, Tensor, Tensor]:
     if torch.isnan(return_).any() or torch.isinf(return_).any(): 
         return -5.0, ema_a, ema_b
-    is_flat = (torch.abs(return_) < 1e-7)
+    #is_flat = (torch.abs(return_) < 1e-7)
     # Compute delta A and B
     delta_a =  return_ - ema_a
     delta_b =  (return_**2) - ema_b
@@ -17,8 +17,8 @@ def reward_func(return_:Tensor, step:int, dsr_nu:Tensor, ema_a:Tensor, ema_b:Ten
     new_ema_a = ema_a + (dsr_nu * delta_a)
     new_ema_b = ema_b + (dsr_nu * delta_b)
     # if step is less than 4
-    if step < 10: return torch.clamp(return_*100, -5.0, 5.0).item(), new_ema_a, new_ema_b
-    if is_flat.item(): return 0.0, new_ema_a, new_ema_b
+    if step < 10: return torch.clamp(return_*50, -5.0, 5.0).item(), new_ema_a, new_ema_b
+    #if is_flat.item(): return 0.0, new_ema_a, new_ema_b
     # Calcul du DSR
     epsilon = 1e-4
     variance = ema_b - (ema_a ** 2)

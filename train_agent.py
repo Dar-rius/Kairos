@@ -21,7 +21,7 @@ wandb.login()
 
 # Agent Hyperparam
 LR = 3e-5
-GAMMA = 0.995
+GAMMA = 0.999
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
 ENT_COEF = 0.3
@@ -36,7 +36,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 6000000
+TOTAL_TIMESTAMP = 1000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS

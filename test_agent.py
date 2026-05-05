@@ -51,7 +51,7 @@ pnl_history : deque[float] = deque()
 past_action = 0
 
 
-for t in tqdm(range(hour_df.shape[0])):
+for t in tqdm(range(2048)):
     action_mask = env.get_action_mask()
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
