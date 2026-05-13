@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
-from visualizer import Visualizer
+from visualizer import Visualizer, log_optimized_regimes
 
 DEVICE = "cpu"
 DATA_PATH = './data_off/train_test/'
@@ -23,11 +23,11 @@ wandb.login()
 LR = 3e-5
 GAMMA = 0.999
 GAE_LAMBDA = 0.95
-CLIP_EPS = 0.2
-ENT_COEF = 0.3
-VALUE_COEF = 0.3
-BELIEF_COEF = 0.2
-CHANGE_COEF = 0.1
+CLIP_EPS = 0.1
+ENT_COEF = 0.001
+VALUE_COEF = 0.5
+BELIEF_COEF = 0.3
+CHANGE_COEF = 0.5
 
 # Load Data
 hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
@@ -36,7 +36,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 1000000
+TOTAL_TIMESTAMP = 6000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
@@ -76,6 +76,7 @@ with wandb.init(project=project, config=config) as run:
         portfolio_value: deque[float] = deque()
         btc_value: deque[float] = deque()
         action_counts = {0: 0, 1: 0, 2: 0}
+        regime_table = wandb.Table(columns=["step", "type", "value"])
         stop = False
         # Collecte phase
         for step in range(ROLLOUT_STEPS):
@@ -85,7 +86,7 @@ with wandb.init(project=project, config=config) as run:
             pos_t = pos_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, mask_action=action_masked)
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
             portfolio_val = env.calcul_portfolio_value()
@@ -127,7 +128,7 @@ with wandb.init(project=project, config=config) as run:
                 next_micro_t = micro_obs.unsqueeze(0)
                 next_macro_t = macro_obs.unsqueeze(0)
                 pos_t = pos_obs.unsqueeze(0)
-                _, _, _, next_value, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
+                _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         short_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
@@ -138,13 +139,17 @@ with wandb.init(project=project, config=config) as run:
         rewards_list = buffer.rewards
         values_list = buffer.values
         dones_list = buffer.dones
+        regime_pred = buffer.beliefs
+        regime_truth = buffer.target_regimes
+        with torch.inference_mode():
+            correct_regimes = (torch.argmax(regime_pred, dim=-1) == regime_truth).float().mean().item()
         returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         #Compute Belief PPO
-        loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
-        trainer.reset_aes()
+        loss, policy_loss, value_loss, belief_loss, change_loss, entropy, complexity = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         #create scatter
         scatter = viz.log_belief_scatter(buffer)
+        log_optimized_regimes(run, update, regime_truth, regime_pred)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,
@@ -160,7 +165,9 @@ with wandb.init(project=project, config=config) as run:
                  'hold frenquency': hold_pct,
                  'buy frequency': buy_pct,
                  'short frequency':short_pct,
-                 'Belief Space 3D': scatter})
+                 'Belief Space 3D': scatter,
+                 'Belief Accuracy': correct_regimes,
+                 'Complexity Level': complexity})
 
 #Save model
 if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)

@@ -19,7 +19,6 @@ class Env():
                  ):
         self.device = device
         self.init_usd_amount = amount_usd
-        self.past_position = torch.tensor([0], dtype=torch.int, device=self.device)
         self.cash =  torch.tensor(self.init_usd_amount, dtype=torch.float32, device=self.device)
         self.btc_shorted = torch.tensor(0.0, dtype=torch.float32, device=self.device)
         self.btc_held = torch.tensor(0.0, dtype=torch.float32, device=self.device)
@@ -48,7 +47,7 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.ema_a = torch.tensor(0.0, dtype=torch.float32, device=device)
         self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
-        self.dsr_nu = torch.tensor(0.003, dtype=torch.float16, device=device)
+        self.dsr_nu = torch.tensor(0.005, dtype=torch.float16, device=device)
         self.step_ = 0
         self.day_total = 0
 
@@ -60,52 +59,6 @@ class Env():
     def _update_p_values(self):
         self.p_values_return[0] = self.p_values_return[1]
         self.p_values_return[1] = self.calcul_portfolio_value()
-
-    def _buy(self):
-        if self.btc_shorted > 0.0:
-            #cover short
-            needed_to_cover = self.btc_shorted * self.btc_value
-            fees = calcul_cost(needed_to_cover, self.cost_rate)
-            total_cost = needed_to_cover + fees
-            if self.cash >= total_cost: 
-                self.cash.sub_(total_cost)
-                self.btc_shorted.fill_(0.0)
-                self.entry_price.fill_(0.0)
-                return
-            else:
-                can_buy = self.cash / (self.btc_value * (1 + self.cost_rate))
-                fees = can_buy * self.btc_value * self.cost_rate
-                pnl = (self.entry_price - self.btc_value) * can_buy
-                self.total_pnl.add_(pnl - fees)
-
-                self.btc_shorted.sub_(can_buy)
-                self.cash.fill_(0.0)
-        if self.cash > 0.0 and self.btc_shorted == 0.0:
-            #buy BTC
-            fees = calcul_cost(self.cash, self.cost_rate)
-            balance = self.cash - fees
-            self.btc_held.add_(balance / self.btc_value)
-            self.entry_price.fill_(self.btc_value)
-            self.cash.fill_(0.0)
-
-    def _sell(self):
-        p_btc = self.btc_held * self.btc_value
-        cost_fees = calcul_cost(p_btc, self.cost_rate)
-        pnl = (self.btc_value - self.entry_price) * self.btc_held
-        self.total_pnl.add_(pnl - cost_fees)
-        self.cash.add_(p_btc - cost_fees)
-        self.btc_held.fill_(0.0)
-        self.entry_price.fill_(0.0)
-
-    def _short(self):
-        if self.btc_held > 0.0:
-            self._sell()
-        p_t = self.calcul_portfolio_value()
-        short_value = p_t * 0.5
-        fees = calcul_cost(short_value, self.cost_rate)
-        self.cash.add_(short_value - fees)
-        self.btc_shorted.add_(short_value / self.btc_value)
-        self.entry_price.fill_(self.btc_value)
 
     def _rebalance(self, target_pos: int):
         """
@@ -207,7 +160,7 @@ class Env():
         daily_trades = self.hour_trade[start:end]
         macro_days = self.macro_trade[macro_idx]
         self.btc_value = self.price[price_idx]
-        current_pos = torch.tensor([self.get_current_position_type()],
+        current_pos = torch.tensor(self.get_current_position_type(),
                                    dtype=torch.float32, device=self.device)
         return daily_trades, macro_days, current_pos.clone()
 
@@ -217,9 +170,9 @@ class Env():
         return torch.tensor(mask, dtype=torch.bool, device=self.device).reshape(1, -1)
 
     def get_current_position_type(self):
-        if self.btc_held > 1e-8: return 1.0    # Long
-        if self.btc_shorted > 1e-8: return -1.0 # Short
-        return 0.0 # Cash
+        if self.btc_held > 1e-8: return [0.0, 0.0, 1.0] # Long
+        if self.btc_shorted > 1e-8: return [1.0, 0.0, 0.0] # Short
+        return [0.0, 1.0, 0.0] # Cash
 
     # Reset the env to 0
     def reset(self, train:bool=True) -> tuple[Tensor, Tensor, Tensor]:

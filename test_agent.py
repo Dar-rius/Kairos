@@ -49,15 +49,15 @@ sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
 pnl_history : deque[float] = deque()
 past_action = 0
+total_hours = 4320 #720 #hour_df.shape[0] # 
 
-
-for t in tqdm(range(2048)):
+for t in tqdm(range(total_hours)):
     action_mask = env.get_action_mask()
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
     pos_obs = pos_obs.unsqueeze(0)
     with torch.no_grad():
-        action_t, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
+        action_t, _, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
     next_obs, _, _, _, _, done = env.step(action_t)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()
@@ -65,7 +65,7 @@ for t in tqdm(range(2048)):
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price)
     action_t -= 1
-    if action_t.item() == past_action or action_t == 0:
+    if action_t.item() == past_action or action_t.item() == 0:
         actions_history.append(0)
     else:
         actions_history.append(action_t.item())
@@ -89,7 +89,10 @@ results_df = pd.DataFrame({
     'btc_value': price_history,
 })
 # Display last history value
-print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpes} \nMax Drawd Down: {mdd}")
+long_percent = actions_history.count(1) / total_hours
+short_percent = actions_history.count(-1) / total_hours
+cash_percent = actions_history.count(0) / total_hours
+print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpes} \nMax Drawd Down: {mdd} \nAction Frequency: {long_percent}%, {cash_percent}%, {short_percent}%")
 # Plot all historic Bloc
 plt.figure(figsize=(15, 10))
 # Sub-graph 1: Price BTC and Actions

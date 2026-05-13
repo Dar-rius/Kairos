@@ -47,8 +47,8 @@ class Agent(nn.Module):
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
         
         # --- FUSION HIÉRARCHIQUE ---
-        # 128 (Micro) + 32 (Macro Context) + 3 (Macro Explicit Prediction)
-        fusion_dim = 128 + 32 + num_regimes + num_change + 1
+        # 128 (Micro) +  3 (Macro Explicit Prediction) +  2 (change state) + 3 (state actions)
+        fusion_dim = 128 + num_regimes + num_change + 3
 
         self.actor_layer = nn.Sequential(
             nn.Linear(fusion_dim, 256),
@@ -78,15 +78,16 @@ class Agent(nn.Module):
 
     def forward(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor):
         # System 2
-        macro_feat, belief_logits, change_logits = self.belief_head(macro_x)
+        _ , belief_logits, change_logits = self.belief_head(macro_x)
         current_belief_probs = torch.softmax(belief_logits, dim=1)
         current_change_probs = torch.sigmoid(change_logits)
+
         # SYSTEM 1
         self.micro_lstm.flatten_parameters()
         _, (h_n, _) = self.micro_lstm(micro_x)
         micro_feat = h_n[-1]
         # FUSION (context)
-        context = torch.cat([micro_feat, macro_feat, current_belief_probs, current_change_probs, pos_type], dim=1)
+        context = torch.cat([micro_feat, current_belief_probs, current_change_probs, pos_type], dim=1)
         action_logits = self.actor_layer(context)
         value = self.critic(context)
         return action_logits, value, belief_logits, change_logits
@@ -105,7 +106,7 @@ class Agent(nn.Module):
         #value is the value for critic
         #belief_probs is the probability for belief
         #belief_entropy
-        return action, log_prob, dist_entropy, value, belief_logits, change_logits, belief_prob, change_prob
+        return action, log_prob, dist_entropy, value, belief_logits, change_logits, belief_prob, change_prob, actor_logits
 
 # FocalLoss
 class FocalLoss(nn.Module):

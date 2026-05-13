@@ -4,7 +4,7 @@ import torch.optim as optim
 import numpy as np
 from torch import Tensor
 from .buffer import Buffer
-from .model import Agent
+from .model import Agent, FocalLoss
 
 # Belief PPO Implementation
 class PPOTrainer:
@@ -21,9 +21,10 @@ class PPOTrainer:
         self.belief_coef = belief_coef
         self.change_coef = change_coef
         self.ent_coef = ent_coef
+        self.ent_coef_end = 0.01
         self.mse_loss = nn.MSELoss()
-        self.ce_loss = nn.CrossEntropyLoss()
-        self.bce_loss = nn.CrossEntropyLoss()
+        self.fl_loss = FocalLoss()
+        self.bfl_loss = FocalLoss()
         self.device = device
         self.A_hat = 0.0
         self.t = 0
@@ -47,18 +48,15 @@ class PPOTrainer:
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = current_lr
 
-    def update_aes(self, td_errors:Tensor) -> float:
-        self.t += 1
-        abs_errors = torch.abs(td_errors)
-        alpha = torch.quantile(abs_errors, .9)
-        self.A_hat += alpha.item()
-        lambda_t_raw = np.sqrt(self.A_hat / self.t)
-        lambda_t = float(np.clip(lambda_t_raw, 0.01, 0.1))
-        return lambda_t
-
-    def reset_aes(self):
-        self.A_hat = 0.0
-        self.t = 0
+    def compute_complexity(self, action_probs: torch.Tensor) -> torch.Tensor:
+        # Entropie H
+        entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+        # Disequilibrium D = sum (p - 1/|A|)^2
+        target_uniform = 1.0 / 3.0
+        disequilibrium = torch.sum((action_probs - target_uniform) ** 2, dim=-1)
+        # Complexitt C = H * D
+        complexity = entropy * disequilibrium
+        return complexity.mean()
 
     # Compute Belief PPO and Update network weights
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
@@ -75,14 +73,14 @@ class PPOTrainer:
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _= self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
-                with torch.no_grad():
-                    vals = new_values.flatten()
-                    delta_proxy = returns[idx].flatten() - vals
-                lambda_t = self.update_aes(delta_proxy)
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits= self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)
+                #compute other
+                action_probs = torch.softmax(actor_logits, dim=-1)
+                #update the complexity
+                complexity = self.compute_complexity(action_probs)
                 # Loss PPO
                 idx_adv = advantages[idx].flatten()
                 surr1 = ratio * idx_adv
@@ -91,18 +89,18 @@ class PPOTrainer:
                 # Loss Value (Critic) - MSE
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx].flatten())
                 # Loss Belief (Auxiliary) - Cross Entropy
-                belief_loss = self.ce_loss(belief_logits, target_regimes[idx].flatten().long())
-                change_loss = self.bce_loss(change_logits, target_changes[idx].flatten().long())
+                belief_loss = self.fl_loss(belief_logits, target_regimes[idx].flatten().long())
+                change_loss = self.bfl_loss(change_logits, target_changes[idx].flatten().long())
                 entropy_loss = dist_entropy.mean()
                 # Total Loss
                 loss = policy_loss + \
                        (self.value_coef * value_loss) + \
-                       (self.belief_coef * belief_loss) + \
+                        (self.belief_coef * belief_loss) + \
                        (self.change_coef * change_loss) - \
-                       (0.02 * entropy_loss)
+                        (self.ent_coef_end * complexity)
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 self.optimizer.step()
-        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), change_loss.item(), dist_entropy.mean().item()
+        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), change_loss.item(), dist_entropy.mean().item(), complexity.item()

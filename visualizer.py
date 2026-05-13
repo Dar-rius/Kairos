@@ -5,12 +5,12 @@ import matplotlib.patches as mpatches
 from matplotlib.colors import ListedColormap
 import plotly.express as px
 import plotly.graph_objects as go
-from collections import deque, Counter
+import wandb
 import torch
 
 class Visualizer:
     def __init__(self):
-        self.colors = {0: '#e74c3c', 1: '#3498db', 2: '#2ecc71'}
+        self.colors = {0: 'red', 1: 'blue', 2: 'green'}
         self.labels = {0: 'Short', 1: 'Hold', 2: 'Buy'}
     
     def log_belief_scatter(self, buffer):
@@ -66,9 +66,9 @@ class Visualizer:
             color=action_names,
             size=sizes,
             color_discrete_map={
-                'Hold': self.colors[0],
-                'Buy': self.colors[1],
-                'Short': self.colors[2]
+                'Short': self.colors[0],
+                'Hold': self.colors[1],
+                'Buy': self.colors[2]
             },
             labels={
                 'x': 'P(Bull)',
@@ -192,3 +192,27 @@ class Visualizer:
         
         if logs:
             wandb.log(logs, step=global_step)
+
+
+    # À placer après ton update de trainer
+def log_optimized_regimes(run, step, truth_buffer, pred_probs_buffer, frequency=10):
+    if step % frequency != 0:
+        return
+
+    # Conversion vectorisée : on détache tout du graphe de calcul
+    # On prend l'argmax sur la dimension des probabilités (dim=-1)
+    truth = truth_buffer.detach().cpu().numpy().flatten()
+    preds = torch.argmax(pred_probs_buffer, dim=-1).detach().cpu().numpy().flatten()
+    
+    # Création d'une matrice [N, 3] : [Index, Type, Valeur]
+    # On échantillonne (ex: 1 point sur 10) pour ne pas saturer W&B sur 10M de steps
+    sample_rate = 5 
+    indices = np.arange(len(truth))[::sample_rate]
+    
+    data = []
+    for i in indices:
+        data.append([i, "truth", int(truth[i])])
+        data.append([i, "predicted", int(preds[i])])
+
+    table = wandb.Table(data=data, columns=["step_idx", "type", "regime_val"])
+    run.log({"Analysis/Regime_Scatter": wandb.plot.scatter(table, "step_idx", "regime_val")})
