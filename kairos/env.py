@@ -47,7 +47,7 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.ema_a = torch.tensor(0.0, dtype=torch.float32, device=device)
         self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
-        self.dsr_nu = torch.tensor(0.005, dtype=torch.float16, device=device)
+        self.dsr_nu = torch.tensor(0.003, dtype=torch.float16, device=device)
         self.step_ = 0
         self.day_total = 0
 

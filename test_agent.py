@@ -49,7 +49,7 @@ sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
 pnl_history : deque[float] = deque()
 past_action = 0
-total_hours = 4320 #720 #hour_df.shape[0] # 
+total_hours = hour_df.shape[0] #4320 #720 # # 
 
 for t in tqdm(range(total_hours)):
     action_mask = env.get_action_mask()

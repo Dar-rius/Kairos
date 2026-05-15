@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
-from visualizer import Visualizer, log_optimized_regimes
+from visualizer import Visualizer
 
 DEVICE = "cpu"
 DATA_PATH = './data_off/train_test/'
@@ -38,7 +38,7 @@ change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
 TOTAL_TIMESTAMP = 6000000
 BATCH_SIZE = 128
-ROLLOUT_STEPS = 2048
+ROLLOUT_STEPS = 4096
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
 viz = Visualizer()
@@ -149,7 +149,6 @@ with wandb.init(project=project, config=config) as run:
         loss, policy_loss, value_loss, belief_loss, change_loss, entropy, complexity = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         #create scatter
         scatter = viz.log_belief_scatter(buffer)
-        log_optimized_regimes(run, update, regime_truth, regime_pred)
         # Clean buffer
         buffer.clear()
         run.log({'loss': loss,
