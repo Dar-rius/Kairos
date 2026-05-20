@@ -47,8 +47,13 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.ema_a = torch.tensor(0.0, dtype=torch.float32, device=device)
         self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
-        self.dsr_nu = torch.tensor(0.003, dtype=torch.float16, device=device)
+        self.dsr_nu = torch.tensor(0.01, dtype=torch.float16, device=device)
         self.step_ = 0
+        self.gamma = torch.tensor(0.001, dtype=torch.float16, device=device)
+        self.beta = torch.tensor(0.05, dtype=torch.float16, device=device)
+        self.alpha = torch.tensor(1.0, dtype=torch.float16, device=device)
+        self.prev_pos = 0
+        self.pos = 0
         self.day_total = 0
 
     def _reset_dsr_stats(self):
@@ -173,6 +178,10 @@ class Env():
         if self.btc_held > 1e-8: return [0.0, 0.0, 1.0] # Long
         if self.btc_shorted > 1e-8: return [1.0, 0.0, 0.0] # Short
         return [0.0, 1.0, 0.0] # Cash
+    
+    def change_pos(self, target_pos: int):
+        self.pos = target_pos
+        self.prev_pos =self.pos
 
     # Reset the env to 0
     def reset(self, train:bool=True) -> tuple[Tensor, Tensor, Tensor]:
@@ -180,11 +189,12 @@ class Env():
         return self.new_state()
 
     # The next step of env
-    def step(self, action:Tensor) -> Any:
+    def step(self, action:Tensor, belief_probs: Tensor) -> Any:
         future_idx = int(min(self.time[0].item() + 1, self.size - 1))
         state_pred = self.state_pred[future_idx] if self.state_pred is not None else None
         change_pred = self.change_pred[future_idx] if self.change_pred is not None else None
         target_pos = int(action.item()) - 1 
+        self.change_pos(target_pos)
         self._rebalance(target_pos)
         self._next()
         next_state = self.new_state()
@@ -199,6 +209,6 @@ class Env():
         else:
             #Compute the reward
             self.step_+=1
-            reward, self.ema_a, self.ema_b = reward_func(return_, self.step_, self.dsr_nu, self.ema_a, self.ema_b)
+            reward, self.ema_a, self.ema_b = reward_func(return_, belief_probs, self.pos, self.prev_pos, self.step_, self.dsr_nu, self.ema_a, self.ema_b, self.alpha, self.gamma, self.beta)
         done = self.time[2] == self.hour_trade.shape[0]
         return next_state, reward, state_pred, change_pred, truncate, done

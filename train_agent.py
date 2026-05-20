@@ -36,9 +36,9 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 6000000
+TOTAL_TIMESTAMP = 5000000
 BATCH_SIZE = 128
-ROLLOUT_STEPS = 4096
+ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
 viz = Visualizer()
@@ -88,7 +88,7 @@ with wandb.init(project=project, config=config) as run:
             with torch.inference_mode():
                 action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, mask_action=action_masked)
 
-            next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t)
+            next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t, belief_probs)
             portfolio_val = env.calcul_portfolio_value()
             if past_action == action_t:
                 action_counts[1] += 1
