@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import entropy
 import math
 import torch
 from torch import Tensor
@@ -22,25 +21,20 @@ def reward_func(return_:Tensor, belief_probs: Tensor, position: int, prev_positi
     # Calcul du DSR
     epsilon = 1e-4
     variance = ema_b - (ema_a ** 2)
-    
     # Calcul DSR
     numerator = (ema_b * delta_a) - (0.5 * ema_a * delta_b)
     denominator = torch.pow(torch.clamp(variance, min=0.0) + epsilon, 1.5)
     dsr = numerator / denominator
-    dsr = torch.clamp(dsr, -1.0, 1.0)
-    
     # Compute the reward
-    belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=-1)
-    max_entropy = torch.log(torch.tensor(3.0))
-    confidence = alpha * (1.0 - (belief_entropy / max_entropy))
-    stability = beta * (dsr * 10.0)
-    return_win = confidence * (position * (return_*10.0))
-    penality = gamma * abs(position - prev_position)
-
-    # 4. Récompense finale
-    total_reward = stability + return_win - penality
-    reward = torch.clamp(total_reward, -5.0, 5.0).item()
-    #print(f"Step: {step} | Return brut: {return_.item()} | Total brute: {total_reward.item()} | Clamped: {reward}")
+    #belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=-1)
+    #max_entropy = torch.log(torch.tensor(3.0))
+    #confidence = 1.0 - (belief_entropy / max_entropy)
+    #stability = dsr * (1.0 + gamma * confidence)
+    #penality = alpha * abs(position - prev_position)
+    #total_reward = stability - penality
+    #reward = torch.clamp(total_reward, -5.0, 5.0).item()
+    reward = torch.clamp(dsr * 10, -5.0, 5.0).item()
+    #print(f"Step: {step} | Return brut: {return_.item()} | DSR: {dsr} | Confidence: {confidence}| Total brute: {reward} ")
     return reward, new_ema_a, new_ema_b
 
 #Compute the sharpe ration

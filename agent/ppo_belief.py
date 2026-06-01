@@ -8,7 +8,18 @@ from .model import Agent, FocalLoss
 
 # Belief PPO Implementation
 class PPOTrainer:
-    def __init__(self, model:Agent, device:str, lr:float=3e-4, gamma:float=0.99, gae_lambda:float=0.95, clip_eps:float=0.2, value_coef:float=0.5, belief_coef:float=0.5, change_coef:float=0.5, ent_coef:float=0.01):
+    def __init__(self,
+                 model:Agent,
+                 lr:float=3e-4,
+                 gamma:float=0.99,
+                 gae_lambda:float=0.95,
+                 clip_eps:float=0.2,
+                 value_coef:float=0.5,
+                 belief_coef:float=0.5,
+                 change_coef:float=0.5,
+                 ent_coef:float=0.01, 
+                 device:str="cpu"
+                 ):
         self.model = model
         self.lr = lr
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
@@ -21,7 +32,7 @@ class PPOTrainer:
         self.belief_coef = belief_coef
         self.change_coef = change_coef
         self.ent_coef = ent_coef
-        self.ent_coef_end = 0.01
+        self.ent_coef_end = 0.02
         self.mse_loss = nn.MSELoss()
         self.fl_loss = FocalLoss()
         self.bfl_loss = FocalLoss()
@@ -66,14 +77,24 @@ class PPOTrainer:
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
-        all_indices = torch.randperm(dataset_size, device=self.device)
+        all_index = torch.randperm(dataset_size, device=self.device)
+        size_total = int((dataset_size / batch_size) * epochs)
+        epoch_losses = torch.zeros((size_total), dtype=torch.float32, device=self.device)
+        epoch_pi_losses = torch.zeros((size_total), device=self.device)
+        epoch_v_losses = torch.zeros((size_total), device=self.device)
+        epoch_b_losses = torch.zeros((size_total), device=self.device)
+        epoch_c_losses = torch.zeros((size_total), device=self.device)
+        epoch_entropies = torch.zeros((size_total), device=self.device)
+        epoch_complexity = torch.zeros((size_total), device=self.device)
+        index_loss = 0
         for _ in range(epochs):
+            all_indices = torch.randperm(dataset_size, device=self.device)
             for start in range(0, dataset_size, batch_size):
                 end = start + batch_size
                 idx = all_indices[start:end]
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits= self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)
@@ -94,13 +115,20 @@ class PPOTrainer:
                 entropy_loss = dist_entropy.mean()
                 # Total Loss
                 loss = policy_loss + \
-                       (self.value_coef * value_loss) + \
+                        (self.value_coef * value_loss) + \
                         (self.belief_coef * belief_loss) + \
-                       (self.change_coef * change_loss) - \
+                        (self.change_coef * change_loss) - \
                         (self.ent_coef_end * complexity)
                 # Backpropagation
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 self.optimizer.step()
-        return loss.item(), policy_loss.item(), value_loss.item(), belief_loss.item(), change_loss.item(), dist_entropy.mean().item(), complexity.item()
+                epoch_losses[index_loss] = loss
+                epoch_pi_losses[index_loss] = policy_loss
+                epoch_v_losses[index_loss] = value_loss
+                epoch_b_losses[index_loss] = belief_loss
+                epoch_c_losses[index_loss] = change_loss
+                epoch_entropies[index_loss] = entropy_loss
+                epoch_complexity[index_loss] = complexity
+        return epoch_losses.mean().item(), epoch_pi_losses.mean().item(), epoch_v_losses.mean().item(), epoch_b_losses.mean().item(), epoch_c_losses.mean().item(), epoch_entropies.mean().item(), epoch_complexity.mean().item()

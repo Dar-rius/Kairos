@@ -49,7 +49,7 @@ sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
 pnl_history : deque[float] = deque()
 past_action = 0
-total_hours = 4320 #hour_df.shape[0]  #720 # # 
+total_hours = hour_df.shape[0] #4320 # #hour_df.shape[0]  #720 # # 
 
 for t in tqdm(range(total_hours)):
     action_mask = env.get_action_mask()
@@ -57,16 +57,16 @@ for t in tqdm(range(total_hours)):
     macro_obs = macro_obs.unsqueeze(0)
     pos_obs = pos_obs.unsqueeze(0)
     with torch.no_grad():
-        action_t, _, _, _, _, _, _, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
-    next_obs, _, _, _, _, done = env.step(action_t)
+        action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
+    next_obs, _, _, _, _, done = env.step(action_t, belief_probs)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()
     portfolio_history.append(current_val)
     copy_portfolio = portfolio_history.copy()
     price_history.append(current_price)
     action_t -= 1
-    if action_t.item() == past_action or action_t.item() == 0:
-        actions_history.append(0)
+    if action_t.item() == past_action:
+        actions_history.append(3)
     else:
         actions_history.append(action_t.item())
         past_action = action_t.item()
@@ -100,9 +100,11 @@ plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
 buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
 short_idx = [i for i, x in enumerate(actions_history) if x == -1]
+cash_idx = [i for i, x in enumerate(actions_history) if x == 0]
 # Display the actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
 plt.scatter(short_idx, [price_history[i] for i in short_idx], marker='v', color='red', label='Short', s=50)
+plt.scatter(cash_idx, [price_history[i] for i in cash_idx], marker='x', color='black', label='Cash', s=50)
 plt.title('Trading Strategy (Price BTC)')
 plt.legend()
 plt.grid(True)

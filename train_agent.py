@@ -12,7 +12,7 @@ from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
 from visualizer import Visualizer
 
-DEVICE = "cpu"
+DEVICE = "cuda"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
@@ -40,7 +40,7 @@ TOTAL_TIMESTAMP = 5000000
 BATCH_SIZE = 128
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
-env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
+env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device="cpu")
 viz = Visualizer()
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
@@ -86,7 +86,7 @@ with wandb.init(project=project, config=config) as run:
             pos_t = pos_obs.unsqueeze(0)
             action_masked = env.get_action_mask()
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, mask_action=action_masked)
+                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t.to(DEVICE), macro_t.to(DEVICE), pos_t.to(DEVICE), mask_action=action_masked.to(DEVICE))
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t, belief_probs)
             portfolio_val = env.calcul_portfolio_value()
@@ -128,7 +128,7 @@ with wandb.init(project=project, config=config) as run:
                 next_micro_t = micro_obs.unsqueeze(0)
                 next_macro_t = macro_obs.unsqueeze(0)
                 pos_t = pos_obs.unsqueeze(0)
-                _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(next_micro_t, next_macro_t, pos_t, mask_action=action_masked)
+                _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(next_micro_t.to(DEVICE), next_macro_t.to(DEVICE), pos_t.to(DEVICE), mask_action=action_masked.to(DEVICE))
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         short_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
