@@ -1,47 +1,47 @@
 # Kairos
 
-Agent de trading Bitcoin basé sur le **Reinforcement Learning** (PPO) avec une architecture双系统 (System 1 / System 2) inspirée du modèle cognitif de Kahneman.
+Bitcoin trading agent built with **Reinforcement Learning** (PPO) using a dual-process architecture (System 1 / System 2) inspired by Kahneman's cognitive model.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      System 2 (MacroHead)               │
-│  Métriques on-chain quotidiennes → Regime + Change      │
+│  Daily on-chain metrics → Regime + Change prediction    │
 │  (MVRV, NVT, Hash Rate, RSI, etc.)                     │
-│  Entraîné séparément avec FocalLoss                     │
+│  Pre-trained with FocalLoss                             │
 └───────────────────────┬─────────────────────────────────┘
                         │ belief_probs + change_probs
 ┌───────────────────────▼─────────────────────────────────┐
-│                      System 1 (Agent PPO)               │
-│  Micro LSTM (fenêtre 24h) ─┐                           │
-│  Macro context ─────────────┤                           │
-│  Position actuelle ────────┼─→ Fusion → Actor + Critic │
-│  Valeur portfolio ─────────┘   (137 features)           │
+│                      System 1 (PPO Agent)               │
+│  Micro LSTM (24h window) ─┐                             │
+│  Macro context ───────────┤                             │
+│  Current position ────────┼─→ Fusion → Actor + Critic   │
+│  Portfolio value ─────────┘   (137 features)            │
 │                                                         │
 │  Actions : Short (0) / Hold (1) / Long (2)             │
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **System 2** (`MacroHead`) : Classifie le régime de marché (Stable/Volatile/Crisis) et prédit les changements. Pré-entraîné sur des données 2015-2018.
-- **System 1** (`Agent`) : Agent PPO qui fusionne les features micro (données horaires via LSTM) avec le contexte macro pour décider de l'action suivante.
+- **System 2** (`MacroHead`): Classifies market regime (Stable/Volatile/Crisis) and predicts imminent changes. Pre-trained on 2015-2018 data.
+- **System 1** (`Agent`): PPO agent that fuses micro features (hourly data via LSTM) with macro context to decide the next action.
 
-## Prérequis
+## Prerequisites
 
 - **Python >= 3.13**
-- **uv** (gestionnaire de packages, pas pip)
-- **CUDA** (optionnel, pour l'entraînement GPU)
+- **uv** (package manager, not pip)
+- **CUDA** (optional, for GPU training)
 
 ## Installation
 
-### 1. Cloner le repository
+### 1. Clone the repository
 
 ```bash
 git clone git@github.com:Dar-rius/Kairos.git
 cd Kairos
 ```
 
-### 2. Installer uv
+### 2. Install uv
 
 ```bash
 # Linux / macOS
@@ -51,84 +51,84 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 3. Installer les dépendances
+### 3. Install dependencies
 
 ```bash
-# Installer PyTorch (CUDA) + toutes les dépendances
+# Install PyTorch (CUDA) + all dependencies
 uv sync
 
-# Installer les outils de développement
+# Install development tools
 uv pip install pytest mypy --extra-index-url https://pypi.org/simple
 ```
 
-> **Note** : Le index par défaut est configuré sur `https://download.pytorch.org/whl/cu130` dans `pyproject.toml`. Les packages non-PyTorch sont installés depuis PyPI via `--extra-index-url`.
+> **Note**: The default index is configured to `https://download.pytorch.org/whl/cu130` in `pyproject.toml`. Non-PyTorch packages are installed from PyPI via `--extra-index-url`.
 
-### 4. Vérifier l'installation
+### 4. Verify installation
 
 ```bash
 uv run python -c "import torch; print(f'PyTorch {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
 ```
 
-### Données
+### Data
 
-Les données ne sont pas incluses dans le repository. Elles doivent être placées dans `data_off/train_test/` :
+Data is not included in the repository. Place your CSV files in `data_off/train_test/`:
 
 ```
 data_off/train_test/
-├── price_train.csv          # Données horaires d'entraînement (2018-2023)
-├── price_test.csv           # Données horaires de test (2023-2026)
-├── metric_pretrain.csv      # Métriques macro pretrain (2015-2018)
-├── metric_train.csv         # Métriques macro entraînement (2018-2023)
-├── metric_test.csv          # Métriques macro test (2023-2026)
-├── state_train.csv          # Labels de regime (entraînement)
-├── state_test.csv           # Labels de regime (test)
-├── change_train.csv         # Labels de changement (entraînement)
-├── change_test.csv          # Labels de changement (test)
-├── price_close_train.csv    # Prix de clôture (entraînement)
-└── price_close_test.csv     # Prix de clôture (test)
+├── price_train.csv          # Hourly training data (2018-2023)
+├── price_test.csv           # Hourly test data (2023-2026)
+├── metric_pretrain.csv      # Macro metrics pretrain (2015-2018)
+├── metric_train.csv         # Macro metrics training (2018-2023)
+├── metric_test.csv          # Macro metrics test (2023-2026)
+├── state_train.csv          # Regime labels (training)
+├── state_test.csv           # Regime labels (test)
+├── change_train.csv         # Change labels (training)
+├── change_test.csv          # Change labels (test)
+├── price_close_train.csv    # Close prices (training)
+└── price_close_test.csv     # Close prices (test)
 ```
 
-Pour préprocesser les données brutes en CSV séparés :
+To preprocess raw data into separate CSVs:
 
 ```bash
 uv run python script.py
 ```
 
-## Pipeline d'entraînement
+## Training Pipeline
 
-### Étape 1 : Entraîner MacroHead (System 2)
+### Step 1: Train MacroHead (System 2)
 
 ```bash
 uv run python train_macro_head.py
 ```
 
-**Sorties** :
-- `agent/save/macro_head.pt` — Poids du modèle
-- `agent/save/macro_scaler.pkl` — Scaler StandardScaler pour les features macro
-- `runs/train_macro/` — Matrices de confusion
+**Outputs**:
+- `agent/save/macro_head.pt` — Model weights
+- `agent/save/macro_scaler.pkl` — StandardScaler for macro features
+- `runs/train_macro/` — Confusion matrices
 
-### Étape 2 : Entraîner l'Agent (System 1)
+### Step 2: Train the Agent (System 1)
 
 ```bash
 uv run python train_agent.py
 ```
 
-**Prérequis** : Connexion `wandb` (logging des métriques).
+**Prerequisite**: `wandb` login required (for metric logging).
 
-**Sorties** :
-- `agent/save/agent_saved.pt` — Poids de l'agent
-- `agent/save/macro_head_1.pt` — Copie du MacroHead après fine-tuning
+**Outputs**:
+- `agent/save/agent_saved.pt` — Agent weights
+- `agent/save/macro_head_1.pt` — MacroHead copy after fine-tuning
 
-> **Note** : L'entraînement est forcé sur CPU malgré la config GPU. Le batch size est de 64 et le rollout fait 2048 steps.
+> **Note**: Training is forced to CPU despite GPU config. Batch size is 64, rollout is 2048 steps.
 
-### Étape 3 : Backtest
+### Step 3: Backtest
 
 ```bash
 uv run python test_agent.py
 ```
 
-**Sorties** :
-- `runs/test/backtest_result_{timestamp}.png` — Graphique du backtest
+**Outputs**:
+- `runs/test/backtest_result_{timestamp}.png` — Backtest chart
 
 ## Hyperparameter Search
 
@@ -138,7 +138,7 @@ uv run python test_agent.py
 uv run python train_macro_hyperparams.py
 ```
 
-Utilise Optuna (50 trials, 150 max trials) avec validation croisée temporelle (10 folds).
+Uses Optuna (50 trials, 150 max trials) with time-series cross-validation (10 folds).
 
 ### Agent (System 1)
 
@@ -146,14 +146,14 @@ Utilise Optuna (50 trials, 150 max trials) avec validation croisée temporelle (
 uv run python search_hyperparams_agent.py
 ```
 
-Utilise Optuna (50 trials, GPU si disponible). Paramètres recherchés :
-- `lr` : learning rate (1e-6 à 1e-3)
-- `gamma` : discount factor (0.80 à 0.99)
-- `gae_lambda` : GAE lambda (0.80 à 0.99)
-- `ent_coef` : coefficient d'entropie (0.01 à 0.9)
-- `value_coef` : coefficient de la loss value (0.05 à 0.5)
-- `belief_coef` : coefficient de la loss belief (0.01 à 0.5)
-- `batch_size` : {64, 128, 256}
+Uses Optuna (50 trials, GPU if available). Search space:
+- `lr`: learning rate (1e-6 to 1e-3)
+- `gamma`: discount factor (0.80 to 0.99)
+- `gae_lambda`: GAE lambda (0.80 to 0.99)
+- `ent_coef`: entropy coefficient (0.01 to 0.9)
+- `value_coef`: value loss coefficient (0.05 to 0.5)
+- `belief_coef`: belief loss coefficient (0.01 to 0.5)
+- `batch_size`: {64, 128, 256}
 
 ## Tests
 
@@ -161,7 +161,7 @@ Utilise Optuna (50 trials, GPU si disponible). Paramètres recherchés :
 uv run pytest tests/
 ```
 
-> **Attention** : Les tests nécessitent `data_off/unit_test/` qui n'est pas inclus. Ils échoueront sans ce répertoire.
+> **Warning**: Tests require `data_off/unit_test/` which is not included. They will fail without this directory.
 
 ## Type Checking
 
@@ -169,7 +169,7 @@ uv run pytest tests/
 mypy kairos/
 ```
 
-> **Note** : `mypy.ini` référence un dossier `rl_trade` inexistant. Utilisez la commande ci-dessus directement.
+> **Note**: `mypy.ini` references a nonexistent `rl_trade` directory. Use the command above directly.
 
 ## Docker
 
@@ -178,52 +178,52 @@ docker build -t kairos .
 docker run --gpus all kairos
 ```
 
-L'image utilise le conteneur NVIDIA PyTorch (`nvcr.io/nvidia/pytorch:25.08-py3`).
+Uses the NVIDIA PyTorch container (`nvcr.io/nvidia/pytorch:25.08-py3`).
 
-## Structure du projet
+## Project Structure
 
 ```
 Kairos/
 ├── agent/
 │   ├── model.py              # MacroHead, Agent, FocalLoss
-│   ├── ppo_belief.py         # Algorithme PPO avec losses auxiliaires
-│   ├── buffer.py             # Rollout buffer (tensors pré-alloués)
-│   ├── save/                 # Poids sauvegardés (gitignoré)
+│   ├── ppo_belief.py         # PPO algorithm with auxiliary losses
+│   ├── buffer.py             # Rollout buffer (pre-allocated tensors)
+│   ├── save/                 # Saved weights (gitignored)
 │   └── __init__.py
 ├── kairos/
-│   ├── env.py                # Environnement de trading
-│   ├── compute.py            # Reward DSR, Sharpe, max drawdown
-│   ├── processing.py         # Conversions unitaires
+│   ├── env.py                # Trading environment
+│   ├── compute.py            # DSR reward, Sharpe ratio, max drawdown
+│   ├── processing.py         # Unit conversions
 │   └── __init__.py
 ├── tests/
-│   └── test_env.py           # Tests unitaires (nécessite données)
+│   └── test_env.py           # Unit tests (requires data)
 ├── data_off/
-│   └── train_test/           # Jeux de données (gitignoré)
+│   └── train_test/           # Datasets (gitignored)
 ├── runs/
-│   └── test/                 # Graphiques de backtest
-├── train_macro_head.py       # Entraînement System 2
-├── train_agent.py            # Entraînement System 1
+│   └── test/                 # Backtest charts
+├── train_macro_head.py       # System 2 training
+├── train_agent.py            # System 1 training
 ├── test_agent.py             # Backtest
-├── search_hyperparams_agent.py    # Optuna pour l'Agent
-├── train_macro_hyperparams.py     # Optuna pour MacroHead
-├── visualizer.py             # Visualisations wandb (3D scatter)
-├── script.py                 # Préprocessing des données
-├── pyproject.toml            # Configuration uv
-├── requirements.txt          # Dépendances complètes
-├── dockerfile                # Image Docker NVIDIA
-└── AGENTS.md                 # Documentation technique
+├── search_hyperparams_agent.py    # Optuna for Agent
+├── train_macro_hyperparams.py     # Optuna for MacroHead
+├── visualizer.py             # wandb visualizations (3D scatter)
+├── script.py                 # Data preprocessing
+├── pyproject.toml            # uv configuration
+├── requirements.txt          # Full dependencies
+├── dockerfile                # NVIDIA Docker image
+└── AGENTS.md                 # Technical documentation
 ```
 
-## Fonctionnalités clés
+## Key Features
 
-- **Reward DSR-based** : Le reward est basé sur le Deflated Sharpe Ratio avec une période de warmup de 10 steps
-- **Action masking** : Possibilité de masquer certaines actions (protection liquidation)
-- **FocalLoss** : Gestion du déséquilibre de classes pour les prédictions macro
-- **PPO clipping** : Stabilisation de l'entraînement avec clip epsilon configurable
-- **Gradient clipping** : Max norm 1.0 pour éviter les explosions de gradients
-- **GAE** : Generalized Advantage Estimation pour l'estimation des avantages
-- **Learning rate decay** : Décroissance linéaire du LR sur toute la durée d'entraînement
+- **DSR-based reward**: Reward based on Deflated Sharpe Ratio with a 10-step warmup period
+- **Action masking**: Ability to mask certain actions (liquidation protection)
+- **FocalLoss**: Handles class imbalance for macro predictions
+- **PPO clipping**: Training stabilization with configurable clip epsilon
+- **Gradient clipping**: Max norm 1.0 to prevent gradient explosions
+- **GAE**: Generalized Advantage Estimation for advantage computation
+- **Learning rate decay**: Linear LR decay over the entire training duration
 
-## Auteur
+## Author
 
 **Dar-rius** — mohamedtine17@gmail.com
