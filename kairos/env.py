@@ -47,7 +47,7 @@ class Env():
         self.p_values_return = torch.tensor([0.0, self.init_usd_amount], dtype=torch.float32, device=self.device)
         self.ema_a = torch.tensor(0.0, dtype=torch.float32, device=device)
         self.ema_b = torch.tensor(0.0, dtype=torch.float32, device=device)
-        self.dsr_nu = torch.tensor(0.01, dtype=torch.float16, device=device)
+        self.dsr_nu = torch.tensor(0.03, dtype=torch.float16, device=device)
         self.step_ = 0
         self.gamma = torch.tensor(2.0, dtype=torch.float16, device=device)
         self.beta = torch.tensor(0.05, dtype=torch.float16, device=device)
@@ -66,9 +66,6 @@ class Env():
         self.p_values_return[1] = self.calcul_portfolio_value()
 
     def _rebalance(self, target_pos: int):
-        """
-        target_pos: -1 (Short), 0 (Neutral), 1 (Long)
-        """
         current_pos = 0
         if self.btc_held > 1e-8: current_pos = 1
         elif self.btc_shorted > 1e-8: current_pos = -1
@@ -96,7 +93,7 @@ class Env():
             self.btc_shorted.fill_(0.0)
 
         self.entry_price.fill_(0.0)
-        p_t = self.calcul_portfolio_value()
+        p_t = self.calcul_portfolio_value().item()
         
         if target_pos == 1: # On veut devenir LONG
             amount_to_use = self.cash * 0.95 
@@ -114,9 +111,9 @@ class Env():
             self.entry_price.fill_(self.btc_value)
 
     def liquidation(self) -> bool:
-        p_t = self.calcul_portfolio_value()
+        p_t = self.calcul_portfolio_value().item()
         val_warn = self.init_usd_amount * 0.1
-        return p_t.item() < val_warn
+        return p_t < val_warn
 
     def _all_reset(self, train:bool=True):
         if train:
@@ -154,7 +151,8 @@ class Env():
         return pnl.item()
 
     def calcul_portfolio_value(self) -> Tensor:
-        return self.cash + (self.btc_held * self.btc_value) - (self.btc_shorted * self.btc_value)
+        value = self.cash + (self.btc_held * self.btc_value) - (self.btc_shorted * self.btc_value)
+        return torch.tensor([value], dtype=torch.float32, device=self.device)
 
     # Create a group state
     def new_state(self) -> tuple[Tensor, Tensor, Tensor]:

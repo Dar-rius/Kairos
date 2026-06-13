@@ -15,8 +15,8 @@ class PPOTrainer:
                  gae_lambda:float=0.95,
                  clip_eps:float=0.2,
                  value_coef:float=0.5,
-                 belief_coef:float=0.5,
-                 change_coef:float=0.5,
+                 belief_coef:float=0.1,
+                 change_coef:float=0.1,
                  ent_coef:float=0.01, 
                  device:str="cpu"
                  ):
@@ -32,7 +32,7 @@ class PPOTrainer:
         self.belief_coef = belief_coef
         self.change_coef = change_coef
         self.ent_coef = ent_coef
-        self.ent_coef_end = 0.02
+        self.ent_coef_end = 0.1
         self.mse_loss = nn.MSELoss()
         self.fl_loss = FocalLoss()
         self.bfl_loss = FocalLoss()
@@ -69,6 +69,9 @@ class PPOTrainer:
         complexity = entropy * disequilibrium
         return complexity.mean()
 
+    #def gradient_diagnostic(self, loss_value:Tensor, loss_policy:Tensor, loss_belief:Tensor):
+        
+
     # Compute Belief PPO and Update network weights
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
         self.lr_decay(self.lr, total_steps, step)
@@ -77,7 +80,7 @@ class PPOTrainer:
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         dataset_size = actions.size(0)
-        all_index = torch.randperm(dataset_size, device=self.device)
+        num_batch = dataset_size // batch_size
         size_total = int((dataset_size / batch_size) * epochs)
         epoch_losses = torch.zeros((size_total), dtype=torch.float32, device=self.device)
         epoch_pi_losses = torch.zeros((size_total), device=self.device)
@@ -87,11 +90,12 @@ class PPOTrainer:
         epoch_entropies = torch.zeros((size_total), device=self.device)
         epoch_complexity = torch.zeros((size_total), device=self.device)
         index_loss = 0
+        batch_rollout = torch.arange(0, dataset_size, batch_size, device=self.device)
         for _ in range(epochs):
-            all_indices = torch.randperm(dataset_size, device=self.device)
-            for start in range(0, dataset_size, batch_size):
+            shuffle_index = batch_rollout[torch.randperm(num_batch, device=self.device)]
+            for start in shuffle_index:
                 end = start + batch_size
-                idx = all_indices[start:end]
+                idx = torch.arange(start, end, device=self.device)
                 if idx.numel() == 0: continue
                 # Evaluate model again
                 _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])

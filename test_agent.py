@@ -56,8 +56,9 @@ for t in tqdm(range(total_hours)):
     micro_obs = micro_obs.unsqueeze(0)
     macro_obs = macro_obs.unsqueeze(0)
     pos_obs = pos_obs.unsqueeze(0)
+    p_value = env.calcul_portfolio_value()
     with torch.no_grad():
-        action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, mask_action=action_mask)
+        action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, p_value, mask_action=action_mask)
     next_obs, _, _, _, _, done = env.step(action_t, belief_probs)
     current_val: float = env.calcul_portfolio_value().item()
     current_price = env.btc_value.item()

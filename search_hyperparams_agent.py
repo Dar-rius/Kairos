@@ -20,9 +20,8 @@ def objective(trial):
     gamma = trial.suggest_float("gamma", 0.80, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.80, 0.99)
     ent_coef = trial.suggest_float("ent_coef", 0.01, 0.9)
-    value_coef = trial.suggest_float("value_coef", 0.01, 0.9)
-    belief_coef = trial.suggest_float("belief_coef", 0.01, 0.9)
-    change_coef = trial.suggest_float("change_coef", 0.01, 0.9)
+    value_coef = trial.suggest_float("value_coef", 0.05, 0.5)
+    belief_coef = trial.suggest_float("belief_coef", 0.01, 0.5)
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
 # Load Data
@@ -32,7 +31,7 @@ def objective(trial):
     state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
     change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
     
-    TOTAL_TIMESTAMP = 2000000
+    TOTAL_TIMESTAMP = 6000000
     ROLLOUT_STEPS = 2048
 
     env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
@@ -41,7 +40,7 @@ def objective(trial):
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)
     belief_model.load_state_dict(torch.load("./agent/save/macro_head.pt", weights_only=True))
     agent = Agent(belief_model, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
-    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, change_coef=change_coef, device=DEVICE)
+    trainer = PPOTrainer(agent, lr=lr, gamma=gamma, gae_lambda=gae_lambda, ent_coef=ent_coef, value_coef=value_coef, belief_coef=belief_coef, device=DEVICE)
     buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
 
     # Run env

@@ -33,7 +33,7 @@ class Buffer:
         self.values = torch.zeros((self.step), device=self.device)
         self.dones = torch.zeros((self.step), device=self.device)
         self.beliefs = torch.zeros((self.step, 3), device=self.device)
-        self.portfolio = torch.zeros((self.step), device=self.device)
+        self.portfolio = torch.zeros((self.step,1), device=self.device)
 
     def insert(self, micro_state:Tensor, macro_state:Tensor, pos_type:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor, beliefs:Tensor, portfolio: Tensor):
         self.micro_states[self.slice] = micro_state
