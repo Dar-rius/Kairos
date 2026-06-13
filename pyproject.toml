@@ -1,7 +1,7 @@
 [project]
 name = "kairos"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bitcoin trading agent using Reinforcement Learning (PPO) with System 1/System 2 architecture"
 readme = "README.md"
 authors = [
     { name = "Dar-rius", email = "mohamedtine17@gmail.com" }
