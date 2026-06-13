@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from torch import Tensor
 import numpy as np
-
 class MacroHead(nn.Module):
     def __init__(self, macro_dim:int, num_regimes:int=3, num_changes:int=2):
         super(MacroHead, self).__init__()
