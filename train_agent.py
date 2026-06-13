@@ -12,7 +12,7 @@ from kairos.compute import calcul_sharpe_ratio, max_dd
 import wandb
 from visualizer import Visualizer
 
-DEVICE = "cpu"
+DEVICE = "cuda:0"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
@@ -36,11 +36,11 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-TOTAL_TIMESTAMP = 5000000
+TOTAL_TIMESTAMP = 3000000
 BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
-env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device="cpu")
+env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
 viz = Visualizer()
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
@@ -129,7 +129,7 @@ with wandb.init(project=project, config=config) as run:
                 next_micro_t = micro_obs.unsqueeze(0)
                 next_macro_t = macro_obs.unsqueeze(0)
                 pos_t = pos_obs.unsqueeze(0)
-                _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(next_micro_t.to(DEVICE), next_macro_t.to(DEVICE), pos_t.to(DEVICE), p_value, mask_action=action_masked.to(DEVICE))
+                _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(next_micro_t.to(DEVICE), next_macro_t.to(DEVICE), pos_t.to(DEVICE), p_value.to(DEVICE), mask_action=action_masked.to(DEVICE))
                 last_value = torch.tensor([next_value.item()], device=DEVICE)
 
         short_pct = (action_counts[0] / ROLLOUT_STEPS) * 100

@@ -24,8 +24,10 @@ class Visualizer:
         # Récupération et nettoyage des données
         beliefs = buffer.beliefs[:buffer.slice].cpu().numpy()
         actions = buffer.actions[:buffer.slice].cpu().numpy()
-        portfolio = buffer.portfolio[:buffer.slice].cpu().numpy()
+        portfolio = buffer.portfolio[:buffer.slice].squeeze(-1)
+        portfolio = portfolio.cpu().numpy()
         
+
         # Filtrage des NaN/Inf
         valid_mask = np.isfinite(portfolio) & np.all(np.isfinite(beliefs), axis=1)
         if not np.any(valid_mask):
