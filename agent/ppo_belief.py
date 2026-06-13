@@ -79,6 +79,7 @@ class PPOTrainer:
         micro_states, macro_states, pos_type, actions, old_log_probs, returns, adv, _, _, _, target_regimes, target_changes, _, _ = memory.get_all()
         # Normalize the advantages
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
         dataset_size = actions.size(0)
         num_batch = dataset_size // batch_size
         size_total = int((dataset_size / batch_size) * epochs)
@@ -98,7 +99,7 @@ class PPOTrainer:
                 idx = torch.arange(start, end, device=self.device)
                 if idx.numel() == 0: continue
                 # Evaluate model again
-                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], actions[idx])
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(micro_states[idx], macro_states[idx], pos_type[idx], p_value[idx], actions[idx])
                 # Compute Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)

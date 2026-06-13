@@ -16,7 +16,7 @@ class Buffer:
     9 -> Target Regime
     10 -> Target Change
     """
-    def __init__(self, step:int, micro_size:int, macro_size:int, device:str):
+    def __init__(self, step:int, micro_size:int, macro_size:int, lstm_layers:int, lstm_hidden:int, device:str):
         self.step = step
         self.slice: int = 0
         self.device = device
@@ -35,7 +35,19 @@ class Buffer:
         self.beliefs = torch.zeros((self.step, 3), device=self.device)
         self.portfolio = torch.zeros((self.step,1), device=self.device)
 
-    def insert(self, micro_state:Tensor, macro_state:Tensor, pos_type:Tensor, action:Tensor, old_log_prob:Tensor,  reward:Tensor, value:Tensor, dones:Tensor, target_regime:Tensor, target_change:Tensor, beliefs:Tensor, portfolio: Tensor):
+    def insert(self, 
+               micro_state:Tensor,
+               macro_state:Tensor,
+               pos_type:Tensor,
+               action:Tensor,
+               old_log_prob:Tensor,
+               reward:Tensor,
+               value:Tensor,
+               dones:Tensor,
+               target_regime:Tensor,
+               target_change:Tensor, 
+               beliefs:Tensor, 
+               portfolio: Tensor):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
         self.pos_type[self.slice] = pos_type
