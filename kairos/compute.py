@@ -1,14 +1,11 @@
+import math
 import pandas as pd
 import numpy as np
-import math
 import torch
 from torch import Tensor
 from collections import deque
 
-def reward_func(return_:Tensor, belief_probs: Tensor, position: int, prev_position: int, step:int, dsr_nu:Tensor, ema_a:Tensor, ema_b:Tensor, alpha: Tensor, gamma: Tensor, beta: Tensor) -> tuple[float, Tensor, Tensor]:
-    if torch.isnan(return_).any() or torch.isinf(return_).any(): 
-        return -5.0, ema_a, ema_b
-    #is_flat = (torch.abs(return_) < 1e-7)
+def reward_func(return_:float, belief_probs:float, position:int, prev_position:int, step:int, dsr_nu:float, ema_a:float, ema_b:float, alpha:float, gamma:float, beta:float) -> tuple[float, float, float]:
     # Compute delta A and B
     delta_a =  return_ - ema_a
     delta_b =  (return_**2) - ema_b
@@ -16,15 +13,14 @@ def reward_func(return_:Tensor, belief_probs: Tensor, position: int, prev_positi
     new_ema_a = ema_a + (dsr_nu * delta_a)
     new_ema_b = ema_b + (dsr_nu * delta_b)
     # if step is less than 4
-    if step < 10: return torch.clamp(return_*50, -5.0, 5.0).item(), new_ema_a, new_ema_b
-    #if is_flat.item(): return 0.0, new_ema_a, new_ema_b
+    if step < 10: return np.clip(return_*50, -5.0, 5.0).item(), new_ema_a, new_ema_b
     # Calcul du DSR
     epsilon = 1e-4
     variance = ema_b - (ema_a ** 2)
     
     # Calcul DSR
     numerator = (ema_b * delta_a) - (0.5 * ema_a * delta_b)
-    denominator = torch.pow(torch.clamp(variance, min=0.0) + epsilon, 1.5)
+    denominator = np.pow(np.clip(variance, min=0.0) + epsilon, 1.5)
     dsr = numerator / denominator
     
     # Compute the reward
@@ -37,7 +33,7 @@ def reward_func(return_:Tensor, belief_probs: Tensor, position: int, prev_positi
 
     #total_reward = stability + return_win - penality
 
-    reward = torch.clamp(dsr*10.0, -5.0, 5.0).item()
+    reward = np.clip(dsr*10.0, -5.0, 5.0).item()
     #print(f"Step: {step} | Return brut: {return_.item()} | DSR: {dsr} | Confidence: {confidence}| Total brute: {reward} ")
     return reward, new_ema_a, new_ema_b
 
@@ -73,13 +69,6 @@ def calcul_cost(amount: Tensor, cost_rate: Tensor) -> Tensor: return amount * co
 
 def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
 
-def return_log_vec(data: list, device:str) -> Tensor:
-    data_ = torch.tensor(data, dtype=torch.float32, device=device)
-    p_return = torch.log(data_[1:]/data_[:-1])
+def return_log(data: list[float]) -> float:
+    p_return = math.log(data[1]/data[0])
     return p_return
-
-#Compute the return log
-def return_log(data: Tensor, device:str) -> Tensor:
-    if data[1] > 1e-8 and data[0] > 1e-8:
-        return torch.log(data[1] / data[0])
-    return torch.tensor(0.0, device=device)
