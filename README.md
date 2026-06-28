@@ -1,27 +1,14 @@
-# Kairos
+> **Note:** A paper about this project will be available soon.
 
-Bitcoin trading agent built with **Reinforcement Learning** (PPO) using a dual-process architecture (System 1 / System 2) inspired by Kahneman's cognitive model.
+This repository is an experimentation of a new variant of PPO (Proximal Policy Optimisation) called PPO-Belief. In this work, we introduce a new auxiliary task “Belief”, it learns to predict the hidden state in a partially observable environment. Also we can see if this architecture can perform in an environment with a lot of hidden state like financial market or physics.
+
+We evaluate this algorithm on the financial market for trading Bitcoin. We chose to trade Bitcoin, because it is known as the asset with the most volatility. We want to see if our algorithm outperforms PPO in this environment.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      System 2 (MacroHead)               │
-│  Daily on-chain metrics → Regime + Change prediction    │
-│  (MVRV, NVT, Hash Rate, RSI, etc.)                     │
-│  Pre-trained with FocalLoss                             │
-└───────────────────────┬─────────────────────────────────┘
-                        │ belief_probs + change_probs
-┌───────────────────────▼─────────────────────────────────┐
-│                      System 1 (PPO Agent)               │
-│  Micro LSTM (24h window) ─┐                             │
-│  Macro context ───────────┤                             │
-│  Current position ────────┼─→ Fusion → Actor + Critic   │
-│  Portfolio value ─────────┘   (137 features)            │
-│                                                         │
-│  Actions : Short (0) / Hold (1) / Long (2)             │
-└─────────────────────────────────────────────────────────┘
-```
+![Agent architecture](./images/architecture.png)
+
+We introduce system-1 and system-2 architecture. The system-2 takes as input a set of macro states of the market, it predicts the regime and change in market state for next time step. The system-1 takes as input a set of micro states markets, the latent vector and predictions from system-2 to select actions in the environment (buy, hold, short).
 
 - **System 2** (`MacroHead`): Classifies market regime (Stable/Volatile/Crisis) and predicts imminent changes. Pre-trained on 2015-2018 data.
 - **System 1** (`Agent`): PPO agent that fuses micro features (hourly data via LSTM) with macro context to decide the next action.
@@ -71,7 +58,9 @@ uv run python -c "import torch; print(f'PyTorch {torch.__version__}, CUDA: {torc
 
 ### Data
 
-Data is not included in the repository. Place your CSV files in `data_off/train_test/`:
+Data is not included in the repository, you download data from Hugging Face [here](https://huggingface.co/datasets/Darrius2020/RL_quant_btc).
+
+Place your CSV files in `data_off/train_test/`:
 
 ```
 data_off/train_test/
@@ -103,6 +92,7 @@ uv run python train_macro_head.py
 ```
 
 **Outputs**:
+
 - `agent/save/macro_head.pt` — Model weights
 - `agent/save/macro_scaler.pkl` — StandardScaler for macro features
 - `runs/train_macro/` — Confusion matrices
@@ -116,6 +106,7 @@ uv run python train_agent.py
 **Prerequisite**: `wandb` login required (for metric logging).
 
 **Outputs**:
+
 - `agent/save/agent_saved.pt` — Agent weights
 - `agent/save/macro_head_1.pt` — MacroHead copy after fine-tuning
 
@@ -128,6 +119,7 @@ uv run python test_agent.py
 ```
 
 **Outputs**:
+
 - `runs/test/backtest_result_{timestamp}.png` — Backtest chart
 
 ## Hyperparameter Search
@@ -147,6 +139,7 @@ uv run python search_hyperparams_agent.py
 ```
 
 Uses Optuna (50 trials, GPU if available). Search space:
+
 - `lr`: learning rate (1e-6 to 1e-3)
 - `gamma`: discount factor (0.80 to 0.99)
 - `gae_lambda`: GAE lambda (0.80 to 0.99)
