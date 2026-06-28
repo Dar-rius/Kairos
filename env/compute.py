@@ -49,7 +49,7 @@ def calcul_sharpe_ratio(p_value:np.ndarray) -> float:
     return 0.0
 
 
-def max_dd(p_value:np.ndarray, dd:bool=False) -> float:
+def calcul_max_dd(p_value:np.ndarray, dd:bool=False) -> float:
     if p_value.shape[0] < 2: return 0.0
     if not np.isfinite(p_value).all(): return 1.0
     if dd:
@@ -64,7 +64,7 @@ def max_dd(p_value:np.ndarray, dd:bool=False) -> float:
 # Calcul the transfer's cost
 def calcul_cost(amount: float, cost_rate: float) -> float: return amount * cost_rate
 
-# Calcul the benefice final of trade 
+# Calcul the benefice final of trade
 def profit_and_loss(all_price:list) -> list: return  all_price[2] - all_price[3]
 
 # Cacul return

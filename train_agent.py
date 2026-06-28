@@ -6,9 +6,9 @@ from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 import torch
-import numpy as np
+import numpy as np_
 import pandas as pd
-from kairos.compute import calcul_sharpe_ratio, max_dd
+from kairos.compute import calcul_sharpe_ratio, calcul_max_dd
 import wandb
 from visualizer import Visualizer
 
@@ -136,7 +136,7 @@ with wandb.init(project=project, config=config) as run:
         hold_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
         buy_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
         sharpe =  calcul_sharpe_ratio(list(portfolio_value))
-        mdd = max_dd(portfolio_value)
+        mdd = calcul_max_dd(portfolio_value)
         rewards_list = buffer.rewards
         values_list = buffer.values
         dones_list = buffer.dones

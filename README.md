@@ -197,13 +197,3 @@ Kairos/
 ├── dockerfile                # NVIDIA Docker image
 └── AGENTS.md                 # Technical documentation
 ```
-
-## Key Features
-
-- **DSR-based reward**: Reward based on Deflated Sharpe Ratio with a 10-step warmup period
-- **Action masking**: Ability to mask certain actions (liquidation protection)
-- **FocalLoss**: Handles class imbalance for macro predictions
-- **PPO clipping**: Training stabilization with configurable clip epsilon
-- **Gradient clipping**: Max norm 1.0 to prevent gradient explosions
-- **GAE**: Generalized Advantage Estimation for advantage computation
-- **Learning rate decay**: Linear LR decay over the entire training duration
