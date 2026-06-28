@@ -75,3 +75,7 @@ def profit_and_loss(all_price:list) -> list: return  all_price[2] - all_price[3]
 def return_log(data: list[float]) -> float:
     p_return = math.log(data[1]/data[0])
     return p_return
+
+def convert_to_btc(amount_usd: float, btc_value: float) -> float: return amount_usd / btc_value
+
+def convert_to_usd(amount_btc: float, btc_value: float) -> float: return amount_btc * btc_value

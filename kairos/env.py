@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
-from .compute import return_log, calcul_cost, profit_and_loss, reward_func
-from .processing import convert_to_btc, convert_to_usd
+from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_btc, convert_to_usd 
 import gymnasium as gym
 from gymnasium import spaces
 from typing import Any
