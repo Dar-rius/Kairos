@@ -210,7 +210,3 @@ Kairos/
 - **Gradient clipping**: Max norm 1.0 to prevent gradient explosions
 - **GAE**: Generalized Advantage Estimation for advantage computation
 - **Learning rate decay**: Linear LR decay over the entire training duration
-
-## Author
-
-**Dar-rius** — mohamedtine17@gmail.com
