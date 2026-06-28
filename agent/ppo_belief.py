@@ -37,8 +37,6 @@ class PPOTrainer:
         self.fl_loss = FocalLoss()
         self.bfl_loss = FocalLoss()
         self.device = device
-        self.A_hat = 0.0
-        self.t = 0
 
     def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor, Tensor, Tensor]:
         gae: Tensor = torch.tensor(0.0)
