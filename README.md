@@ -8,7 +8,7 @@ We evaluate this algorithm on the financial market for trading Bitcoin. We chose
 
 ![Agent architecture](./images/architecture.png)
 
-We introduce system-1 and system-2 architecture. The system-2 takes as input a set of macro states of the market, it predicts the regime and change in market state for next time step. The system-1 takes as input a set of micro states markets, the latent vector and predictions from system-2 to select actions in the environment (buy, hold, short).
+We introduce system-1 and system-2 architecture. The system-2 takes as input a set of macro states market, it predicts the regime and change in market state for next time step. The system-1 takes as input a set of micro states markets, the latent vector and predictions from system-2 to select actions in the environment (buy, hold, short).
 
 - **System 2** (`MacroHead`): Classifies market regime (Stable/Volatile/Crisis) and predicts imminent changes. Pre-trained on 2015-2018 data.
 - **System 1** (`Agent`): PPO agent that fuses micro features (hourly data via LSTM) with macro context to decide the next action.
@@ -58,7 +58,7 @@ uv run python -c "import torch; print(f'PyTorch {torch.__version__}, CUDA: {torc
 
 ### Data
 
-Data is not included in the repository, you download data from Hugging Face [here](https://huggingface.co/datasets/Darrius2020/RL_quant_btc).
+Data is not included in the repository, you can download data from Hugging Face [here](https://huggingface.co/datasets/Darrius2020/RL_quant_btc).
 
 Place your CSV files in `data_off/train_test/`:
 
@@ -68,13 +68,7 @@ data_off/train_test/
 ├── price_test.csv           # Hourly test data (2023-2026)
 ├── metric_pretrain.csv      # Macro metrics pretrain (2015-2018)
 ├── metric_train.csv         # Macro metrics training (2018-2023)
-├── metric_test.csv          # Macro metrics test (2023-2026)
-├── state_train.csv          # Regime labels (training)
-├── state_test.csv           # Regime labels (test)
-├── change_train.csv         # Change labels (training)
-├── change_test.csv          # Change labels (test)
-├── price_close_train.csv    # Close prices (training)
-└── price_close_test.csv     # Close prices (test)
+└── metric_test.csv          # Macro metrics test (2023-2026)
 ```
 
 To preprocess raw data into separate CSVs:
