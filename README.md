@@ -45,7 +45,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 uv sync
 
 # Install development tools
-uv pip install pytest mypy --extra-index-url https://pypi.org/simple
+uv pip install mypy --extra-index-url https://pypi.org/simple
 ```
 
 > **Note**: The default index is configured to `https://download.pytorch.org/whl/cu130` in `pyproject.toml`. Non-PyTorch packages are installed from PyPI via `--extra-index-url`.
