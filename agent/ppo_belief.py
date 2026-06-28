@@ -62,7 +62,7 @@ class PPOTrainer:
 
 
     # Calcul alla loss for all auxillary task and updates weights
-    def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10):
+    def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10) -> tuple:
         self.lr_decay(self.lr, total_steps, step)
         micro_states, macro_states, pos_type, actions, old_log_probs, returns, adv, _, _, _, change_true, belief_true, p_value = memory.get_all()
         # Normalize the advantages and returns
@@ -86,14 +86,15 @@ class PPOTrainer:
                 end = start + batch_size
                 idx = torch.arange(start, end, device=self.device)
                 if idx.numel() == 0: continue
-                # Evaluate model again
+
                 _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(
                         micro_states[idx],
                         macro_states[idx],
                         pos_type[idx],
                         p_value[idx],
                         actions[idx])
-                # Compute Ratio (new Policy / old Policy)
+
+                # Calcul Ratio (new Policy / old Policy)
                 logratio = new_log_probs - old_log_probs[idx]
                 ratio = torch.exp(logratio)
 
@@ -130,4 +131,9 @@ class PPOTrainer:
                 epoch_c_losses[index_loss] = change_loss
                 epoch_entropies[index_loss] = entropy_loss
 
-        return epoch_losses.mean().item(), epoch_pi_losses.mean().item(), epoch_v_losses.mean().item(), epoch_b_losses.mean().item(), epoch_c_losses.mean().item(), epoch_entropies.mean().item()
+        return (epoch_losses.mean().item(),
+                epoch_pi_losses.mean().item(),
+                epoch_v_losses.mean().item(),
+                epoch_b_losses.mean().item(),
+                epoch_c_losses.mean().item(),
+                epoch_entropies.mean().item())
