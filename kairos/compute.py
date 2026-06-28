@@ -65,10 +65,13 @@ def max_dd(portfolio: deque[float], dd:bool=False) -> float:
     mdd = torch.max(drawdowns)
     return mdd.item()
 
-def calcul_cost(amount: Tensor, cost_rate: Tensor) -> Tensor: return amount * cost_rate
+# Calcul the transfer's cost
+def calcul_cost(amount: float, cost_rate: float) -> float: return amount * cost_rate
 
-def profit_and_loss(total_price:Tensor) -> Tensor: return  total_price[2] - total_price[3]
+# Calcul the benefice final of trade 
+def profit_and_loss(all_price:list) -> list: return  all_price[2] - all_price[3]
 
+# Cacul return
 def return_log(data: list[float]) -> float:
     p_return = math.log(data[1]/data[0])
     return p_return
