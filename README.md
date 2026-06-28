@@ -179,11 +179,8 @@ Kairos/
 │   └── __init__.py
 ├── kairos/
 │   ├── env.py                # Trading environment
-│   ├── compute.py            # DSR reward, Sharpe ratio, max drawdown
-│   ├── processing.py         # Unit conversions
+│   ├── compute.py            # DSR reward, Sharpe ratio, max drawdown, fees and unit conversions
 │   └── __init__.py
-├── tests/
-│   └── test_env.py           # Unit tests (requires data)
 ├── data_off/
 │   └── train_test/           # Datasets (gitignored)
 ├── runs/
