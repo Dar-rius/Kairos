@@ -38,18 +38,18 @@ class PPOTrainer:
         self.device = device
 
     
-    def compute_gae(self, rewards:Tensor, values:Tensor, last_value:Tensor, dones:Tensor) -> tuple[Tensor, Tensor, Tensor]:
-        gae: Tensor = torch.tensor(0.0)
+    def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:np.ndarray, dones:np.ndarray) -> tuple:
+        gae = 0.0
         mask = 1.0 - dones
-        next_values = torch.cat((values[1:], last_value), 0)
-        total_size = rewards.size(0)
-        advantages = torch.zeros_like(rewards)
+        next_values = np.concatenate((values[1:], last_value), axis=0)
+        total_size = rewards.shape[0]
+        advantages = np.zeros_like(rewards)
         delta = rewards + self.gamma * next_values * mask - values
         for step in reversed(range(total_size)):
             gae = delta[step] + self.gamma * self.gae_lambda * mask[step] * gae
             advantages[step] =  gae
         returns = advantages + values
-        return (returns, advantages, delta)
+        return (returns.item(), advantages.item(), delta.item())
 
     def lr_decay(self, lr:float, total_steps:int, step:int):
         frac = 1.0 - (step / total_steps)
