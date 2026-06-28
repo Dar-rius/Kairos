@@ -33,7 +33,7 @@ class MacroHead(nn.Module):
         nn.init.orthogonal_(self.change_head.weight, gain=1.0)
         nn.init.constant_(self.change_head.bias, 0.0)
 
-    def forward(self, macro_x:Tensor):
+    def forward(self, macro_x:np.ndarray):
         x = self.macro_net(macro_x)
         belief_logits = self.belief_head(x)
         change_logits = self.change_head(x)
@@ -46,7 +46,7 @@ class Agent(nn.Module):
         self.micro_lstm = nn.LSTM(micro_dim, 128, batch_first=True)
         
         # --- FUSION HIÉRARCHIQUE ---
-        # 128 (Micro) +  3 (Macro Explicit Prediction) +  2 (change state) + 3 (state actions)
+        # 128 (Micro) +  3 (Macro Explicit Prediction) +  2 (change state) + 3 (state actions) + 1 (portfolio value)
         fusion_dim = 128 + num_regimes + num_change + 3 + 1
 
         self.actor_layer = nn.Sequential(
@@ -120,13 +120,9 @@ class FocalLoss(nn.Module):
 
     def forward(self, inputs, targets):
         ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
-        pt = torch.exp(-ce_loss) 
-        
+        pt = torch.exp(-ce_loss)
         # Application de l'équation de la Focal Loss
         focal_loss = ((1 - pt) ** self.gamma) * ce_loss
-        
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
+        if self.reduction == 'sum':
             return focal_loss.sum()
-        return focal_loss
+        return focal_loss.mean()

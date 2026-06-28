@@ -20,34 +20,34 @@ class Buffer:
         self.step = step
         self.slice: int = 0
         self.device = device
-        self.micro_states = torch.zeros((self.step, 24, micro_size), device=self.device)
-        self.macro_states = torch.zeros((self.step, macro_size), device=self.device)
-        self.pos_type = torch.zeros((self.step, 3), device=self.device)
-        self.actions = torch.zeros((self.step), dtype=torch.long, device=self.device)
-        self.old_log_probs = torch.zeros((self.step), device=self.device)
-        self.returns = torch.zeros((self.step), device=self.device)
-        self.adv = torch.zeros((self.step), device=self.device)
-        self.target_regimes = torch.zeros((self.step), dtype=torch.long, device=self.device)
-        self.target_changes = torch.zeros((self.step), dtype=torch.long, device=self.device)
-        self.rewards = torch.zeros((self.step), device=self.device)
-        self.values = torch.zeros((self.step), device=self.device)
-        self.dones = torch.zeros((self.step), device=self.device)
-        self.beliefs = torch.zeros((self.step, 3), device=self.device)
-        self.portfolio = torch.zeros((self.step,1), device=self.device)
+        self.micro_states = np.zeros((self.step, 24, micro_size))
+        self.macro_states = np.zeros((self.step, macro_size))
+        self.pos_type = np.zeros((self.step, 3))
+        self.actions = np.zeros((self.step))
+        self.old_log_probs = np.zeros(self.step)
+        self.returns = np.zeros(self.step)
+        self.adv = np.zeros(self.step)
+        self.target_regimes = np.zeros(self.step)
+        self.target_changes = np.zeros(self.step)
+        self.rewards = np.zeros(self.step)
+        self.values = np.zeros(self.step)
+        self.dones = np.zeros(self.step)
+        self.beliefs = np.zeros((self.step, 3))
+        self.portfolio = np.zeros((self.step,1))
 
     def insert(self, 
-               micro_state:Tensor,
-               macro_state:Tensor,
-               pos_type:Tensor,
-               action:Tensor,
-               old_log_prob:Tensor,
-               reward:Tensor,
-               value:Tensor,
-               dones:Tensor,
-               target_regime:Tensor,
-               target_change:Tensor, 
-               beliefs:Tensor, 
-               portfolio: Tensor):
+               micro_state:np.ndarray,
+               macro_state:np.ndarray,
+               pos_type:list,
+               action:int,
+               old_log_prob:float,
+               reward:float,
+               value:float,
+               dones:int,
+               target_regime:int,
+               target_change:int,
+               beliefs:int,
+               portfolio: float):
         self.micro_states[self.slice] = micro_state
         self.macro_states[self.slice] = macro_state
         self.pos_type[self.slice] = pos_type
@@ -62,17 +62,26 @@ class Buffer:
         self.portfolio[self.slice] = portfolio
         self.slice += 1
 
-    def insert_returns(self, returns:Tensor, adv:Tensor):
+    def insert_returns(self, returns:float, adv:float):
         self.returns[:] = returns
         self.adv[:] = adv
     
     # sampling data
     def get_all(self) -> tuple:
-        return (self.micro_states, self.macro_states,
-                self.pos_type, self.actions, self.old_log_probs,
-                self.returns, self.adv, self.rewards,
-                self.values, self.dones, self.target_regimes,
-                self.target_changes, self.beliefs, self.portfolio)
+        return (torch.tensor(self.micro_states, dtype=torch.float32, device=self.device),
+                torch.tensor(self.macro_states, dtype=torch.float32, device=self.device),
+                torch.tensor(self.pos_type, dtype=torch.long, device=self.device),
+                torch.tensor(self.actions, dtype=torch.long, device=self.device),
+                torch.tensor(self.old_log_probs, dtype=torch.float32, device=self.device),
+                torch.tensor(self.returns, dtype=torch.float32, device=self.device),
+                torch.tensor(self.adv, dtype=torch.float32, device=self.device),
+                torch.tensor(self.rewards, dtype=torch.float32, device=self.device),
+                torch.tensor(self.values, dtype=torch.float32, device=self.device),
+                torch.tensor(self.dones, dtype=torch.long, device=self.device),
+                torch.tensor(self.target_regimes, dtype=torch.long, device=self.device),
+                torch.tensor(self.target_changes, dtype=torch.long,  device=self.device),
+                torch.tensor(self.beliefs, dtype=torch.long, device=self.device),
+                torch.tensor(self.portfolio, dtype=torch.float32, device=self.device))
 
     # Delete all data
     def clear(self):
