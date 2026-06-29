@@ -1,29 +1,30 @@
-from collections import deque
 import os
 import datetime
 import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from kairos.env import Env
+from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from kairos.compute import calcul_sharpe_ratio,max_dd
+from kairos.compute import calcul_sharpe_ratio, calcul_mdd
+from collections import deque
 
 # Config
-DEVICE = "cpu"
+DEVICE = "cuda"
 AGENT_PATH = './agent/save/agent_saved.pt'
-BELIEF_PATH = './agent/save/macro_head_1.pt'
+MACRO_WEIGHTS_PATH = './agent/save/macro_head_1.pt'
 DATA_PATH = './data_off/train_test/'
 GRAPH_PATH = "./runs/test"
-# DataFrame
-hour_df = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
-macro_df = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
+
+# Load data
+micro_states = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
+macro_states = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 usd_amount = 10000.0
 
-# Initialization
-env = Env(hour_df, macro_df, price_series, amount_usd=usd_amount, use_scaler=True, device=DEVICE)
+# Initialize the environment
+env = Env(micro_states, macro_states, price_series, amount_usd=usd_amount, use_scaler=True)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 n_days = 0
@@ -31,8 +32,8 @@ n_days = 0
 # Load weights
 macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
 print(f"Load model from {AGENT_PATH}...")
-print(f"Load model from {BELIEF_PATH}...")
-macro_head.load_state_dict(torch.load(BELIEF_PATH, weights_only=True, map_location=DEVICE))
+print(f"Load model from {MACRO_WEIGHTS_PATH}...")
+macro_head.load_state_dict(torch.load(MACRO_WEIGHTS_PATH, weights_only=True, map_location=DEVICE))
 macro_head.eval()
 agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
 agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
@@ -41,7 +42,7 @@ agent.eval()
 print("Run the Backtest...")
 micro_obs, macro_obs, pos_obs = env.reset(train=False)
 
-# Tracking
+# Variables that stored the train historic
 portfolio_history : deque[float] = deque()
 price_history : deque[float] = deque()
 actions_history : deque[int] = deque()
@@ -49,22 +50,23 @@ sharpes : deque[float] = deque()
 mdd : deque[float] = deque()
 pnl_history : deque[float] = deque()
 past_action = 0
-total_hours = hour_df.shape[0] #4320 # #hour_df.shape[0]  #720 # # 
+total_hours = micro_states.shape[0]
 
+# Start inference on environment
 for t in tqdm(range(total_hours)):
-    action_mask = env.get_action_mask()
-    micro_obs = micro_obs.unsqueeze(0)
-    macro_obs = macro_obs.unsqueeze(0)
-    pos_obs = pos_obs.unsqueeze(0)
+    btc_val = env.btc_value
     p_value = env.calcul_portfolio_value()
+    macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
     with torch.no_grad():
-        action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_obs, macro_obs, pos_obs, p_value, mask_action=action_mask)
+        action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
+    
+    #Next environment step
     next_obs, _, _, _, _, done = env.step(action_t, belief_probs)
-    current_val: float = env.calcul_portfolio_value().item()
-    current_price = env.btc_value.item()
-    portfolio_history.append(current_val)
-    copy_portfolio = portfolio_history.copy()
-    price_history.append(current_price)
+
+    #Stored the historic data
+    portfolio_history.append(p_value)
+    copy_portfolio = np.array(portfolio_history.copy())
+    price_history.append(btc_val)
     action_t -= 1
     if action_t.item() == past_action:
         actions_history.append(3)
@@ -72,53 +74,57 @@ for t in tqdm(range(total_hours)):
         actions_history.append(action_t.item())
         past_action = action_t.item()
     pnl_history.append(env.get_pnl())
+
+    #Calcul Sharpe Ratio
     if  t % 8760 == 0:
-        portfolio_s = pd.Series(copy_portfolio)
-        returns = portfolio_s.pct_change().dropna()
-        if returns.std() == 0.0:
-            sharpes.append(0.0)
-        else:
-            sharpe = (returns.mean() / returns.std()) * np.sqrt(8760)
-            sharpes.append(sharpe.item())
-        mdd.append(max_dd(portfolio_history))
-        copy_portfolio.clear()
+        sr = calcul_sharpe_ratio(copy_portfolio)
+        mdd_ = calcul_mdd(copy_portfolio)
+        sharpes.append(sr)
+        mdd.append(mdd_)
     if done: break
     micro_obs, macro_obs , pos_obs = next_obs
 
-results_df = pd.DataFrame({
-    'portfolio_value': portfolio_history,
-    'btc_value': price_history,
-})
-# Display last history value
+# Display historic data
 long_percent = actions_history.count(1) / total_hours
 short_percent = actions_history.count(-1) / total_hours
 cash_percent = actions_history.count(0) / total_hours
-print(f"Portfolio Final: {portfolio_history[-1]:.2f}$, \nPnL Final (Net): {pnl_history[-1]:.2f}$ \nSharpe Ratio: {sharpes} \nMax Drawd Down: {mdd} \nAction Frequency: {long_percent}%, {cash_percent}%, {short_percent}%")
-# Plot all historic Bloc
+print(f"""Portfolio Final: {portfolio_history[-1]:.2f}$,
+      \nPnL Final (Net): {pnl_history[-1]:.2f}$
+      \nSharpe Ratio: {sharpes}
+      \nMax Drawd Down: {mdd}
+      \nAction Frequency: {long_percent}%, {cash_percent}%, {short_percent}%""")
+
+# Plot historic data
 plt.figure(figsize=(15, 10))
-# Sub-graph 1: Price BTC and Actions
+
+# Sub-graph 1: BTC price
 plt.subplot(2, 1, 1)
 plt.plot(price_history, label='BTC Price', color='gray', alpha=0.5)
+plt.title('BTC price evolution')
+plt.legend()
+plt.grid(True)
+
+# Enumerate all actions
 buy_idx = [i for i, x in enumerate(actions_history) if x == 1]
 short_idx = [i for i, x in enumerate(actions_history) if x == -1]
 cash_idx = [i for i, x in enumerate(actions_history) if x == 0]
-# Display the actions
+
+# Display actions
 plt.scatter(buy_idx, [price_history[i] for i in buy_idx], marker='^', color='green', label='Buy', s=50)
 plt.scatter(short_idx, [price_history[i] for i in short_idx], marker='v', color='red', label='Short', s=50)
 plt.scatter(cash_idx, [price_history[i] for i in cash_idx], marker='x', color='black', label='Cash', s=50)
-plt.title('Trading Strategy (Price BTC)')
-plt.legend()
-plt.grid(True)
+
 # Sub-graph 2: Porfolio Value
 plt.subplot(2, 1, 2)
 plt.plot(portfolio_history, label='Portfolio Value ($)', color='blue')
-plt.axhline(y=usd_amount, color='r', linestyle='--', label='Initial Capital') # Assumant 100k départ
-plt.title('Porfolio Evolution')
+plt.axhline(y=usd_amount, color='r', linestyle='--', label='Initial Capital')
+plt.title('Porfolio value evolution')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
 
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+#Save graph
 if not os.path.exists(GRAPH_PATH): os.makedirs(GRAPH_PATH)
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 plt.savefig(f'{GRAPH_PATH}/backtest_result_{timestamp}.png')
 print(f"Save img: {GRAPH_PATH}/backtest_result_{timestamp}.png")

@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from collections import deque
-from kairos.env import Env
+from rl_trade.env import Env
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
@@ -30,8 +30,8 @@ BELIEF_COEF = 0.3
 CHANGE_COEF = 0.5
 
 # Load data
-hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
-macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
+micro_states = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
+macro_states = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
@@ -43,7 +43,7 @@ ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 
 # Initialize classes
-env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
+env = Env(micro_states, macro_states, price_series, state_series, change_series, use_scaler=True)
 # Visualizer for actions based on his predictions regime
 viz = Visualizer()
 ACTION_DIM = env.action_space
@@ -83,6 +83,7 @@ global_step = 0
 # Training Loop
 with wandb.init(project=PROJECT, config=config) as run:
     for update in tqdm(range(1, NUM_UPDATE + 1)):
+        # Variables that stored train historic
         cumulative_reward = 0.0
         cumulative_pnl = 0.0
         past_action = 0
@@ -123,6 +124,7 @@ with wandb.init(project=PROJECT, config=config) as run:
                 beliefs = int(torch.argmax(belief_probs).item()),
                 portfolio = p_value
             )
+            #Update the historic
             cumulative_reward += reward
             cumulative_pnl += env.get_pnl()
             portfolio_history.append(p_value.item())
@@ -153,12 +155,13 @@ with wandb.init(project=PROJECT, config=config) as run:
         buy_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
         sharpe =  calcul_sharpe_ratio(portfolio_history_np)
         mdd = calcul_max_dd(portfolio_history_np)
-        #Calcul the GAE
+
         rewards_list = buffer.rewards
         values_list = buffer.values
         dones_list = buffer.dones
         regime_pred = buffer.beliefs
         regime_truth = buffer.target_regimes
+        #Calcul the GAE
         with torch.no_grad():
             correct_regimes = (regime_pred == regime_truth).float().mean().item()
         returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)

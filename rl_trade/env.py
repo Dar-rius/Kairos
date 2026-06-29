@@ -22,14 +22,11 @@ class Env():
         self.btc_held = 0.0
         self.btc_value = 0.0
         self.use_scaler = use_scaler
-        if self.use_scaler:
-            # Normalized all dataset
-            self.micro_scaler = StandardScaler()
-            self.macro_scaler = joblib.load("./agent/save/macro_scaler.pkl")
-            scaled_micro = self.micro_scaler.fit_transform(micro_state.to_numpy())
-            scaled_macro = self.macro_scaler.transform(macro_state.to_numpy())
-            self.micro_state = scaled_micro
-            self.macro_state = scaled_macro
+        self.macro_state = macro_state
+        self.micro_state = micro_state
+        self.micro_scaler = StandardScaler()
+        self.micro_scaler.fit(micro_state)
+        self.macro_scaler = joblib.load("./agent/save/macro_scaler.pkl")
         self.total_pnl = 0.0
         self.entry_price = 0.0
         self.regime_pred = regime_pred.to_numpy() if regime_pred is not None else None
@@ -159,8 +156,8 @@ class Env():
         price_idx = min(self.time[2], self.price.shape[0] - 1)
         start = self.time[1]
         end = self.time[2] + 1
-        daily_states = self.micro_state[start:end]
-        macro_days = self.macro_state[macro_idx]
+        daily_states = self.micro_scaler.transform(self.micro_state[start:end])
+        macro_days = self.macro_scaler.transform(self.macro_state[macro_idx])
         self.btc_value = self.price[price_idx]
         current_pos = self.get_current_position_type()
         return daily_states, macro_days, current_pos

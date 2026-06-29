@@ -1,14 +1,15 @@
 import os
 import datetime
 import torch
-from torch import Tensor
 import torch.optim as optim
 import pandas as pd
 import numpy as np
-from agent.model import MacroHead, FocalLoss
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 from sklearn.metrics import confusion_matrix, classification_report, f1_score
+from torch import Tensor
+from agent.model import MacroHead, FocalLoss
 from torch import nn
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
@@ -16,7 +17,7 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, cla
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
 from collections import deque
-import joblib
+
 
 #Generate and plot Confusion matrix 
 def gen_conf_matrix(y_true: np.array, y_pred: np.array, path:str, class_names:list):

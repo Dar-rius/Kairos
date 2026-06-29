@@ -35,7 +35,7 @@ def reward_func(return_:float, belief_probs:float, position:int, prev_position:i
     return reward, new_ema_a, new_ema_b
 
 
-def calcul_sharpe_ratio(p_value:np.ndarray) -> float:
+def calcul_sharpe_ratio(p_value:np.ndarray, time:int=8760) -> float:
     if p_value.shape[0] < 2: return 0.0
     if not np.isfinite(p_value).all(): return 0.0
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -43,13 +43,13 @@ def calcul_sharpe_ratio(p_value:np.ndarray) -> float:
         returns = np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
     std_dev = np.std(returns)
     if std_dev > 1e-8:
-        sharpe = (np.mean(returns) / std_dev) * np.sqrt(365 * 24)
+        sharpe = (np.mean(returns) / std_dev) * np.sqrt(time)
         if np.isnan(sharpe) or np.isinf(sharpe): return 0.0
         return float(sharpe)
     return 0.0
 
 
-def calcul_max_dd(p_value:np.ndarray, dd:bool=False) -> float:
+def calcul_mdd(p_value:np.ndarray, dd:bool=False) -> float:
     if p_value.shape[0] < 2: return 0.0
     if not np.isfinite(p_value).all(): return 1.0
     if dd:
