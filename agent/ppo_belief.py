@@ -38,7 +38,7 @@ class PPOTrainer:
         self.device = device
 
     
-    def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:np.ndarray, dones:np.ndarray) -> tuple:
+    def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:float, dones:np.ndarray) -> tuple[float, float, float]:
         gae = 0.0
         mask = 1.0 - dones
         next_values = np.concatenate((values[1:], last_value), axis=0)
@@ -49,7 +49,7 @@ class PPOTrainer:
             gae = delta[step] + self.gamma * self.gae_lambda * mask[step] * gae
             advantages[step] =  gae
         returns = advantages + values
-        return (returns.item(), advantages.item(), delta.item())
+        return (float(returns.item()), float(advantages.item()), float(delta.item()))
 
     def lr_decay(self, lr:float, total_steps:int, step:int):
         frac = 1.0 - (step / total_steps)

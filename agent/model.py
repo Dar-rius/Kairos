@@ -53,9 +53,7 @@ class Agent(nn.Module):
             nn.Linear(fusion_dim, 256),
             nn.ReLU(),
             nn.Linear(256, action_dim))
-        
         self.critic = nn.Linear(fusion_dim, 1)
-        
         self._init_weights()
 
     def _init_weights(self):
@@ -81,7 +79,7 @@ class Agent(nn.Module):
         current_belief_probs = torch.softmax(belief_logits, dim=1)
         current_change_probs = torch.sigmoid(change_logits)
 
-        # SYSTEM 1
+        # System 1
         self.micro_lstm.flatten_parameters()
         _, (h_n, _) = self.micro_lstm(micro_x)
         micro_feat = h_n[-1]
@@ -93,20 +91,14 @@ class Agent(nn.Module):
         value = self.critic(context)
         return action_logits, value, belief_logits, change_logits
 
-    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor, p_value:Tensor, action:int=None, mask_action:Tensor=None):
+    def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor, p_value:Tensor, action:int=None):
         actor_logits, value, belief_logits, change_logits = self.forward(micro_x, macro_x, pos_type, p_value)
-        if mask_action is not None: actor_logits = actor_logits.masked_fill(~mask_action, -9e8)
         probs = Categorical(logits=actor_logits)
         if action is None: action = probs.sample() 
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
         belief_prob = torch.softmax(belief_logits, dim=-1)
         change_prob = torch.sigmoid(change_logits)
-        #log_prob is the probability action
-        #dist_entropy is the entropy Bonus
-        #value is the value for critic
-        #belief_probs is the probability for belief
-        #belief_entropy
         return action, log_prob, dist_entropy, value, belief_logits, change_logits, belief_prob, change_prob, actor_logits
 
 # FocalLoss

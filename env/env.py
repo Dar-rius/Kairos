@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
-from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_btc, convert_to_usd 
 import gymnasium as gym
+import joblib
+import random
+import torch
+from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_btc, convert_to_usd 
 from gymnasium import spaces
 from typing import Any
 from sklearn.preprocessing import StandardScaler
-import joblib
-import random
-from torch import Tensor
 
 # ******* ENV **********
 class Env():
@@ -169,7 +169,7 @@ class Env():
     def get_current_position_type(self) -> list[float]:
         if self.btc_held > 1e-8: return [0.0, 0.0, 1.0] # Long
         if self.btc_shorted > 1e-8: return [1.0, 0.0, 0.0] # Short
-        return [0.0, 1.0, 0.0] 
+        return [0.0, 1.0, 0.0]
     
     def change_pos(self, target_pos:int):
         self.pos = target_pos
@@ -180,7 +180,15 @@ class Env():
         self._all_reset(train)
         return self.new_state()
 
-    # The next step  
+    def convert_to_tensor(self, macro_state:np.ndarray, micro_state:np.ndarray, pos_type:np.ndarray, p_value:float, device:str) -> tuple:
+        return (
+                torch.tensor(macro_state, dtype=torch.float32, device=device).unsqueeze(0),
+                torch.tensor(micro_state, dtype=torch.float32, device=device).unsqueeze(0),
+                torch.tensor(pos_type, dtype=torch.long, device=device).unsqueeze(0),
+                torch.tensor(p_value, dtype=torch.float32, device=device).unsqueeze(0)
+                )
+
+    # The next step
     def step(self, action:Tensor, belief_probs: Tensor) -> Any:
         future_idx = min(self.time[0] + 1, self.size - 1)
         regime_pred = self.regime_pred[future_idx] if self.regime_pred is not None else None

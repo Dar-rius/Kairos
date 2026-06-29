@@ -16,7 +16,7 @@ class Buffer:
     9 -> Target Regime
     10 -> Target Change
     """
-    def __init__(self, step:int, micro_size:int, macro_size:int, lstm_layers:int, lstm_hidden:int, device:str):
+    def __init__(self, step:int, micro_size:int, macro_size:int, device:str):
         self.step = step
         self.slice: int = 0
         self.device = device
