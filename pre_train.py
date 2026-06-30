@@ -94,7 +94,7 @@ feature_cols = ['mvrv_z_score','mom_24h','mom_168h',
                 'mvrv_diff', 'hashRate_ma7']
 X = df_final[feature_cols].values.astype(np.float32)
 
-#Select target of belief and change 
+#Select target of belief and change
 y_belief = df_final['regime'].values.astype(np.int64)
 y_change = df_final['change'].values.astype(np.int64)
 fold = 0
@@ -122,9 +122,7 @@ for train_index, val_index in tscv.split(X):
                                  torch.LongTensor(y_train_belief), 
                                  torch.LongTensor(y_train_change))
     train_loader = DataLoader(train_tensor, batch_size=BATCH_SIZE, shuffle=True)
-    X_val_tensor = torch.FloatTensor(X_val_scaled)
-    y_val_belief_tensor = torch.LongTensor(y_val_belief)
-    y_val_change_tensor = torch.LongTensor(y_val_change)
+    x_val_tensor = torch.FloatTensor(X_val_scaled)
 
     #Initialize the errors evaluator
     criterion_belief = FocalLoss(alpha=weights_tensor_belief)
@@ -149,7 +147,7 @@ for train_index, val_index in tscv.split(X):
     #Evaluate the model validation phase
     model.eval()
     with torch.no_grad():
-        _, val_belief_logits, val_change_logits = model(X_val_tensor)
+        _, val_belief_logits, val_change_logits = model(x_val_tensor)
         pred_belief = torch.argmax(val_belief_logits, dim=1).cpu().numpy()
         pred_change = torch.argmax(val_change_logits, dim=1).cpu().numpy()
 

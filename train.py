@@ -36,7 +36,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 regime_series = pd.read_csv(f"{DATA_PATH}regime_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
-# Environment params
+# Training parameters 
 TOTAL_TIMESTAMP = 3000000
 BATCH_SIZE = 64
 ROLLOUT_STEPS = 2048
@@ -127,8 +127,8 @@ with wandb.init(project=PROJECT, config=config) as run:
             #Update the historic
             cumulative_reward += reward
             cumulative_pnl += env.get_pnl()
-            portfolio_history.append(p_value.item())
-            btc_history.append(env.btc_value.item())
+            portfolio_history.append(p_value)
+            btc_history.append(env.btc_value)
 
             if done or truncate:
                 micro_obs, macro_obs, pos_obs = env.reset()
@@ -140,7 +140,7 @@ with wandb.init(project=PROJECT, config=config) as run:
         if stop:
             last_value = 0.0
         else:
-            #Collecte the last critric value
+            #Collect the last critric value
             with torch.inference_mode():
                 macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
                 _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
@@ -168,7 +168,7 @@ with wandb.init(project=PROJECT, config=config) as run:
         buffer.insert_returns(returns, adv)
         
         #Update the weights
-        loss, policy_loss, value_loss, belief_loss, change_loss, entropy, complexity = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
         #create scatter visualization
         scatter = viz.log_belief_scatter(buffer)
         # Clean buffer

@@ -134,6 +134,7 @@ class Env():
         self.btc_shorted = 0.0
         self._reset_dsr_stats()
 
+    #shift by one the env timestep from historic dataset
     def _next(self):
         self.time[1] += 1
         self.time[2] += 1
@@ -151,7 +152,7 @@ class Env():
         return value
 
     # Create a  set of state group
-    def new_state(self) -> tuple[np.ndarray, np.ndarray, list]:
+    def new_state(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         macro_idx = min(self.time[0], self.size - 1)
         price_idx = min(self.time[2], self.price.shape[0] - 1)
         start = self.time[1]
@@ -163,17 +164,18 @@ class Env():
         return daily_states, macro_days, current_pos
 
     #Get the current action (position)
-    def get_current_position_type(self) -> list[float]:
-        if self.btc_held > 1e-8: return [0.0, 0.0, 1.0] # Long
-        if self.btc_shorted > 1e-8: return [1.0, 0.0, 0.0] # Short
-        return [0.0, 1.0, 0.0]
+    def get_current_position_type(self) -> np.ndarray:
+        if self.btc_held > 1e-8: return np.array([0.0, 0.0, 1.0]) # Long
+        if self.btc_shorted > 1e-8: return np.array([1.0, 0.0, 0.0]) # Short
+        return np.array([0.0, 1.0, 0.0])
     
+    #Change the trading position from agent's action 
     def change_pos(self, target_pos:int):
         self.pos = target_pos
         self.prev_pos = self.pos
 
     # Reset all data and choose the new state
-    def reset(self, train:bool=True) -> tuple[np.ndarray, np.ndarray, list]:
+    def reset(self, train:bool=True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         self._all_reset(train)
         return self.new_state()
 
