@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from rl_trade.env import Env
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from kairos.compute import calcul_sharpe_ratio, calcul_mdd
+from env.compute import calcul_sharpe_ratio, calcul_mdd
 from collections import deque
 
 # Config

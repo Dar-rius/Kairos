@@ -4,6 +4,7 @@ import gymnasium as gym
 import joblib
 import random
 import torch
+from torch import Tensor
 from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_btc, convert_to_usd 
 from gymnasium import spaces
 from typing import Any
@@ -13,8 +14,7 @@ from sklearn.preprocessing import StandardScaler
 class Env():
     def __init__(self, micro_state:pd.DataFrame, macro_state:pd.DataFrame,
                  price:pd.Series, regime_pred:pd.Series=None, change_pred:pd.Series=None,
-                 amount_usd:float=100000.0, cost_rate:float=0.001,
-                 use_scaler:bool=False, dsr_eta:float=0.1, dsr_warmup:int=10
+                 amount_usd:float=100000.0, cost_rate:float=0.001, use_scaler:bool=False
                  ):
         self.init_usd_amount = amount_usd
         self.cash = self.init_usd_amount
@@ -205,7 +205,7 @@ class Env():
             reward = -10.0
             truncate = True
         else:
-            #Compute the reward
+            #Calcul the reward
             self.step_+=1
             reward, self.ema_a, self.ema_b = reward_func(return_, belief_,
                                                          self.pos, self.prev_pos,

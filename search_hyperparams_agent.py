@@ -1,21 +1,23 @@
-from kairos.env import Env
+import torch
+import numpy as np
+import pandas as pd
+import optuna 
+from rl_trade.env import Env
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-import torch
-import numpy as np
-import pandas as pd
-import optuna
-from kairos.compute import calcul_sharpe_ratio
 from collections import deque
 
+
+#Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Training on: {DEVICE}")
 DATA_PATH = './data_off/train_test/'
 
+# Optuna function
 def objective(trial):
-# Agent Hyperparam
+    # Train hyper-params 
     lr = trial.suggest_float("lr", 1e-6, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.80, 0.99)
     gae_lambda = trial.suggest_float("gae_lambda", 0.80, 0.99)
@@ -24,17 +26,17 @@ def objective(trial):
     belief_coef = trial.suggest_float("belief_coef", 0.01, 0.5)
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
-# Load Data
-    hour_df = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
-    macro_df = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
+    # Load Data
+    micro_state = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
+    macro_state = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
     price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
-    state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
+    regime_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
     change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
     
     TOTAL_TIMESTAMP = 6000000
     ROLLOUT_STEPS = 2048
 
-    env = Env(hour_df, macro_df, price_series, state_series, change_series, use_scaler=True, device=DEVICE)
+    env = Env(hour_df, macro_df, price_series, regime_series, change_series, use_scaler=True, device=DEVICE)
     ACTION_DIM = env.action_space
     STATE_DIM = env.observation_space
     belief_model =  MacroHead(STATE_DIM[1]).to(DEVICE)

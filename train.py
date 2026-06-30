@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 from collections import deque
 from rl_trade.env import Env
+from rl_trade.compute import calcul_sharpe_ratio, calcul_max_dd
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from kairos.compute import calcul_sharpe_ratio, calcul_max_dd
 from visualizer import Visualizer
 
 # Config
@@ -33,7 +33,7 @@ CHANGE_COEF = 0.5
 micro_states = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
 macro_states = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
-state_series = pd.read_csv(f"{DATA_PATH}state_train.csv")["regime"]
+regime_series = pd.read_csv(f"{DATA_PATH}regime_train.csv")["regime"]
 change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
 
 # Environment params
@@ -43,7 +43,7 @@ ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 
 # Initialize classes
-env = Env(micro_states, macro_states, price_series, state_series, change_series, use_scaler=True)
+env = Env(micro_states, macro_states, price_series, regime_series, change_series, use_scaler=True)
 # Visualizer for actions based on his predictions regime
 viz = Visualizer()
 ACTION_DIM = env.action_space
