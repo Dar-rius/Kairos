@@ -42,7 +42,7 @@ agent.eval()
 print("Run the Backtest...")
 micro_obs, macro_obs, pos_obs = env.reset(train=False)
 
-# Variables that stored the train historic
+#The tests historic 
 portfolio_history : deque[float] = deque()
 price_history : deque[float] = deque()
 actions_history : deque[int] = deque()
