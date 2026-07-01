@@ -4,14 +4,13 @@ import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from rl_trade.env import Env
+from rl_trade.env import Env from rl_trade.compute import calcul_sharpe_ratio, calcul_mdd
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
-from env.compute import calcul_sharpe_ratio, calcul_mdd
 from collections import deque
 
 # Config
-DEVICE = "cuda"
+DEVICE = "cuda:0"
 AGENT_PATH = './agent/save/agent_saved.pt'
 MACRO_WEIGHTS_PATH = './agent/save/macro_head_1.pt'
 DATA_PATH = './data_off/train_test/'

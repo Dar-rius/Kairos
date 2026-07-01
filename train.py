@@ -13,7 +13,7 @@ from tqdm import tqdm
 from visualizer import Visualizer
 
 # Config
-DEVICE = "cpu"
+DEVICE = "cuda:0"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
