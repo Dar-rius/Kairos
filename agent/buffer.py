@@ -32,7 +32,7 @@ class Buffer:
         self.rewards = np.zeros(self.step)
         self.values = np.zeros(self.step)
         self.dones = np.zeros(self.step)
-        self.beliefs = np.zeros(self.step)
+        self.beliefs = np.zeros((self.step, 3))
         self.portfolio = np.zeros((self.step,1))
 
     def insert(self, 

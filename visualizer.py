@@ -2,33 +2,33 @@ import wandb
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.colors import ListedColormap
 import plotly.express as px
-import plotly.graph_objects as go
-import wandb
-import torch
 
 class Visualizer:
     def __init__(self):
         self.colors = {0: 'red', 1: 'blue', 2: 'green'}
         self.labels = {0: 'Short', 1: 'Hold', 2: 'Buy'}
     
+    #Get all buffer data that we need
+    def _get_buffer_data(self, buffer):
+        if buffer.slice == 0:
+            return None, None, None
+            
+        beliefs = buffer.beliefs[:buffer.slice]
+        actions = buffer.actions[:buffer.slice].astype(int)
+        portfolio = buffer.portfolio[:buffer.slice].reshape(-1)
+        return beliefs, actions, portfolio
+
+    #Log a belief 3D Dscatter
     def log_belief_scatter(self, buffer):
         """
         Scatter 3D: X=P(Bull), Y=P(Bear), Z=P(Sideways)
         Color=Action, Size=Portfolio
         """
-        if buffer.slice == 0:
+        beliefs, actions, portfolio = self._get_buffer_data(buffer)
+        if beliefs is None:
             return None
             
-        # Récupération et nettoyage des données
-        beliefs = buffer.beliefs[:buffer.slice].cpu().numpy()
-        actions = buffer.actions[:buffer.slice].cpu().numpy()
-        portfolio = buffer.portfolio[:buffer.slice].squeeze(-1)
-        portfolio = portfolio.cpu().numpy()
-        
-
-        # Filtrage des NaN/Inf
         valid_mask = np.isfinite(portfolio) & np.all(np.isfinite(beliefs), axis=1)
         if not np.any(valid_mask):
             return None
@@ -44,27 +44,24 @@ class Visualizer:
         # Sampling si trop de points (perf wandb)
         if n_points > 3000:
             idx = np.random.choice(n_points, 3000, replace=False)
-            beliefs = beliefs[idx]
-            actions = actions[idx]
-            portfolio = portfolio[idx]
+            beliefs, actions, portfolio = beliefs[idx], actions[idx], portfolio[idx]
             n_points = 3000
         
-        # Normalisation des tailles pour plotly (5 à 50)
+        # Normalize ploty size (5 to 50)
         p_min, p_max = portfolio.min(), portfolio.max()
         portfolio_clean = np.nan_to_num(portfolio, nan=p_min, posinf=p_max, neginf=p_min)
+        
         if p_max > p_min:
-            sizes = sizes = 5 + 45 * (portfolio_clean - p_min) / (p_max - p_min)
+            sizes = 5 + 45 * (portfolio_clean - p_min) / (p_max - p_min)
         else:
             sizes = np.full_like(portfolio, 20)
         
         # Mapping actions
         action_names = np.array([self.labels[a] for a in actions])
         
-        # Création figure Plotly
+        # Create a new ploty figure
         fig = px.scatter_3d(
-            x=beliefs[:, 0],
-            y=beliefs[:, 1],
-            z=beliefs[:, 2],
+            x=beliefs[:, 0], y=beliefs[:, 1], z=beliefs[:, 2],
             color=action_names,
             size=sizes,
             color_discrete_map={
@@ -73,74 +70,69 @@ class Visualizer:
                 'Buy': self.colors[2]
             },
             labels={
-                'x': 'P(Bull)',
-                'y': 'P(Bear)',
-                'z': 'P(Sideways)',
-                'color': 'Action',
-                'size': 'Relative Size'
+                'x': 'P(Bull)', 'y': 'P(Bear)', 'z': 'P(Sideways)',
+                'color': 'Action', 'size': 'Relative Size'
             },
             title=f'Belief Space 3D (n={n_points})',
             opacity=0.7,
-            height=700,
-            width=900
+            height=700, width=900
         )
         
-        # Optimisation layout
-        fig.update_traces(marker=dict(line=dict(width=0)))
+        # Optimize layout
+        fig.update_traces(marker={"line":{"width":0}})
         fig.update_layout(
-            scene=dict(
-                xaxis=dict(range=[0, 1]),
-                yaxis=dict(range=[0, 1]),
-                zaxis=dict(range=[0, 1]),
-                aspectmode='cube',
-                camera=dict(eye=dict(x=1.2, y=1.2, z=1.0))
-            )
+            scene={
+                "xaxis":{"range":[0, 1]},
+                "yaxis":{"range":[0, 1]},
+                "zaxis":{"range":[0, 1]},
+                "aspectmode":'cube',
+                "camera":{"eye":{"x":1.2, "y":1.2, "z":1.0}}
+                }
         )
         
         return wandb.Html(fig.to_html(full_html=False, include_plotlyjs='cdn'))
     
     def log_portfolio_timeline(self, buffer):
         """Timeline portfolio avec zones d'action"""
-        portfolio = buffer.portfolio[:buffer.slice].cpu().numpy()
-        actions = buffer.actions[:buffer.slice].cpu().numpy()
-        
-        if len(portfolio) == 0:
+        _, actions, portfolio = self._get_buffer_data(buffer)
+        if portfolio is None or len(portfolio) == 0:
             return None
         
         fig, ax = plt.subplots(figsize=(14, 6))
         
-        # Zones d'actions consécutives
-        start_idx = 0
-        curr_action = int(actions[0])
+        changes = np.where(actions[:-1] != actions[1:])[0] + 1
+        starts = np.insert(changes, 0, 0)
+        ends = np.append(changes, len(actions))
         
-        for i in range(1, len(actions)):
-            if int(actions[i]) != curr_action or i == len(actions) - 1:
-                ax.axvspan(start_idx, i, alpha=0.2, color=self.colors[curr_action])
-                start_idx = i
-                curr_action = int(actions[i])
+        # Tracé des zones d'actions
+        for start, end in zip(starts, ends):
+            curr_action = actions[start]
+            ax.axvspan(start, end - 1, alpha=0.2, color=self.colors[curr_action])
         
+        # Tracé du portfolio
         ax.plot(portfolio, color='black', linewidth=2)
         ax.fill_between(range(len(portfolio)), portfolio, alpha=0.1, color='gray')
+        
         ax.set_xlabel('Time Step')
         ax.set_ylabel('Portfolio ($)')
         ax.set_title('Portfolio Evolution')
         
+        # Légende
         patches = [mpatches.Patch(color=self.colors[i], label=self.labels[i], alpha=0.5) 
-                  for i in range(3)]
+                   for i in range(3)]
         ax.legend(handles=patches, loc='upper left')
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
         img = wandb.Image(fig)
         plt.close(fig)
+        
         return img
     
     def log_regime_action_dist(self, buffer):
         """Distribution des actions par régime"""
-        beliefs = buffer.beliefs[:buffer.slice].cpu().numpy()
-        actions = buffer.actions[:buffer.slice].cpu().numpy()
-        
-        if len(actions) == 0:
+        beliefs, actions, _ = self._get_buffer_data(buffer)
+        if actions is None or len(actions) == 0:
             return None
         
         regimes = np.argmax(beliefs, axis=1)
@@ -149,9 +141,10 @@ class Visualizer:
         data = np.zeros((3, 3))
         for r in range(3):
             mask = regimes == r
-            if mask.sum() > 0:
-                for a in range(3):
-                    data[r, a] = (actions[mask] == a).mean() * 100
+            if mask.any():
+                # np.bincount compte les occurrences de 0, 1, 2 efficacement
+                counts = np.bincount(actions[mask], minlength=3)[:3]
+                data[r] = (counts / counts.sum()) * 100
         
         fig, ax = plt.subplots(figsize=(10, 6))
         x = np.arange(3)
@@ -171,26 +164,24 @@ class Visualizer:
         plt.tight_layout()
         img = wandb.Image(fig)
         plt.close(fig)
+        
         return img
     
     def log_all(self, buffer, global_step=None):
         """Logue tous les graphes incluant le scatter 3D"""
         logs = {}
         
-        # Scatter 3D (Plotly interactif)
         scatter_3d = self.log_belief_scatter(buffer)
         if scatter_3d:
             logs['belief_space_3d'] = scatter_3d
-        
-        # Timeline
+            
         timeline = self.log_portfolio_timeline(buffer)
         if timeline:
             logs['portfolio_timeline'] = timeline
-        
-        # Régime/Action
+            
         regime_dist = self.log_regime_action_dist(buffer)
         if regime_dist:
             logs['regime_action_dist'] = regime_dist
-        
+            
         if logs:
             wandb.log(logs, step=global_step)

@@ -108,6 +108,7 @@ with wandb.init(project=PROJECT, config=config) as run:
                 action_counts[int(action_t)] += 1
             past_action = action_t
             done_casted = 1 if done else 0
+            belief_casted = belief_probs.squeeze(0).cpu().numpy()
             
             #Insert data in buffer and variables
             buffer.insert(
@@ -118,11 +119,11 @@ with wandb.init(project=PROJECT, config=config) as run:
                 old_log_prob=log_prob_t,
                 reward=reward,
                 value=value_t.item(),
-                dones = done_casted,
+                dones=done_casted,
                 target_regime=target_regime,
                 target_change=target_change,
-                beliefs = int(torch.argmax(belief_probs).item()),
-                portfolio = p_value
+                beliefs=belief_casted,
+                portfolio=p_value
             )
             #Update the historic
             cumulative_reward += reward
@@ -163,9 +164,9 @@ with wandb.init(project=PROJECT, config=config) as run:
         regime_truth = buffer.target_regimes
         #Calcul the GAE
         with torch.inference_mode():
-            correct_regimes = (regime_pred == regime_truth).mean().item()
-        returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
-        buffer.insert_returns(returns, adv)
+            returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
+            buffer.insert_returns(returns, adv)
+            correct_regimes = (np.argmax(regime_pred, axis=-1) == regime_truth).mean().item()
         
         #Update the weights
         loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
