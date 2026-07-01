@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from collections import deque
 from rl_trade.env import Env
-from rl_trade.compute import calcul_sharpe_ratio, calcul_max_dd
+from rl_trade.compute import calcul_sharpe_ratio, calcul_mdd
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
@@ -13,7 +13,7 @@ from tqdm import tqdm
 from visualizer import Visualizer
 
 # Config
-DEVICE = "cuda:0"
+DEVICE = "cpu"
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
