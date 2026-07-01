@@ -38,10 +38,10 @@ class PPOTrainer:
         self.device = device
 
     
-    def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:float, dones:np.ndarray) -> tuple[float, float, float]:
+    def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:float, dones:np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         gae = 0.0
         mask = 1.0 - dones
-        next_values = np.concatenate((values[1:], last_value), axis=0)
+        next_values = np.concatenate((values[1:], [last_value]), axis=0)
         total_size = rewards.shape[0]
         advantages = np.zeros_like(rewards)
         delta = rewards + self.gamma * next_values * mask - values
@@ -49,7 +49,7 @@ class PPOTrainer:
             gae = delta[step] + self.gamma * self.gae_lambda * mask[step] * gae
             advantages[step] =  gae
         returns = advantages + values
-        return (float(returns.item()), float(advantages.item()), float(delta.item()))
+        return (returns, advantages, delta)
 
     def lr_decay(self, lr:float, total_steps:int, step:int):
         frac = 1.0 - (step / total_steps)
@@ -64,7 +64,7 @@ class PPOTrainer:
     # Calcul alla loss for all auxillary task and updates weights
     def update(self, memory:Buffer, total_steps:int, step:int, batch_size:int=64, epochs:int=10) -> tuple:
         self.lr_decay(self.lr, total_steps, step)
-        micro_states, macro_states, pos_type, actions, old_log_probs, returns, adv, _, _, _, change_true, belief_true, p_value = memory.get_all()
+        micro_states, macro_states, pos_type, actions, old_log_probs, returns, adv, _, _, _, belief_true, change_true, _, p_value = memory.get_all()
         # Normalize the advantages and returns
         advantages = (adv - adv.mean()) / (adv.std() + 1e-8)
         returns = (returns - returns.mean()) / (returns.std() + 1e-8)
@@ -107,8 +107,8 @@ class PPOTrainer:
                 # Calcul the value loss (Critic)
                 value_loss = self.mse_loss(new_values.flatten(), returns[idx].flatten())
                 # Calcul the belief loss (Representation augmented)
-                belief_loss = self.fl_loss(belief_logits.flatten(), belief_true[idx].flatten().long())
-                change_loss = self.bfl_loss(change_logits.flatten(), change_true[idx].flatten().long())
+                belief_loss = self.fl_loss(belief_logits, belief_true[idx].long())
+                change_loss = self.bfl_loss(change_logits, change_true[idx].flatten().long())
                 entropy_loss = dist_entropy.mean()
 
                 # Update weights

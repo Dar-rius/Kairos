@@ -22,11 +22,10 @@ class Env():
         self.btc_held = 0.0
         self.btc_value = 0.0
         self.use_scaler = use_scaler
-        self.macro_state = macro_state
-        self.micro_state = micro_state
         self.micro_scaler = StandardScaler()
-        self.micro_scaler.fit(micro_state)
+        self.micro_state = self.micro_scaler.fit_transform(micro_state)
         self.macro_scaler = joblib.load("./agent/save/macro_scaler.pkl")
+        self.macro_state = self.macro_scaler.transform(macro_state)
         self.total_pnl = 0.0
         self.entry_price = 0.0
         self.regime_pred = regime_pred.to_numpy() if regime_pred is not None else None
@@ -35,9 +34,9 @@ class Env():
         # Timestep in environment [Day, Start Hour, Last Hour]
         self.time = [0, 0, 23]
         self.cost_rate = cost_rate
-        self.size = self.macro_state.shape[0]
+        self.size = macro_state.shape[0]
         self.seq = 24
-        self.observation_space = [self.micro_state.shape[1], self.macro_state.shape[1]]
+        self.observation_space = [micro_state.shape[1], macro_state.shape[1]]
         self.action_space = 3
         self.p_values_return = [0.0, self.init_usd_amount]
         self.ema_a = 0.0
@@ -52,8 +51,8 @@ class Env():
         self.day_total = 0
 
     def _reset_dsr_stats(self):
-        self.ema_a.fill_(0.0)
-        self.ema_b.fill_(0.0)
+        self.ema_a = 0.0
+        self.ema_b = 0.0
         self.step_ = 0
 
     def _update_p_values(self):
@@ -157,8 +156,8 @@ class Env():
         price_idx = min(self.time[2], self.price.shape[0] - 1)
         start = self.time[1]
         end = self.time[2] + 1
-        daily_states = self.micro_scaler.transform(self.micro_state[start:end])
-        macro_days = self.macro_scaler.transform(self.macro_state[macro_idx])
+        daily_states = self.micro_state[start:end]
+        macro_days = self.macro_state[macro_idx]
         self.btc_value = self.price[price_idx]
         current_pos = self.get_current_position_type()
         return daily_states, macro_days, current_pos
@@ -193,7 +192,7 @@ class Env():
         regime_pred = self.regime_pred[future_idx] if self.regime_pred is not None else None
         change_pred = self.change_pred[future_idx] if self.change_pred is not None else None
         target_pos = int(action.item()) - 1
-        belief_: float = belief_probs.item()
+        belief_: np.ndarray = belief_probs.cpu().numpy()
         self.change_pos(target_pos)
         self._rebalance(target_pos)
         self._next()

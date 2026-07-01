@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 from collections import deque
 
-def reward_func(return_:float, belief_probs:float, position:int, prev_position:int, step:int, dsr_nu:float, ema_a:float, ema_b:float, alpha:float, gamma:float, beta:float) -> tuple[float, float, float]:
+def reward_func(return_:float, belief_probs:np.ndarray, position:int, prev_position:int, step:int, dsr_nu:float, ema_a:float, ema_b:float, alpha:float, gamma:float, beta:float) -> tuple[float, float, float]:
     # Calcul delta A and B
     delta_a =  return_ - ema_a
     delta_b =  (return_**2) - ema_b

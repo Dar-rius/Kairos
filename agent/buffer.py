@@ -32,7 +32,7 @@ class Buffer:
         self.rewards = np.zeros(self.step)
         self.values = np.zeros(self.step)
         self.dones = np.zeros(self.step)
-        self.beliefs = np.zeros((self.step, 3))
+        self.beliefs = np.zeros(self.step)
         self.portfolio = np.zeros((self.step,1))
 
     def insert(self, 
@@ -62,7 +62,7 @@ class Buffer:
         self.portfolio[self.slice] = portfolio
         self.slice += 1
 
-    def insert_returns(self, returns:float, adv:float):
+    def insert_returns(self, returns:np.ndarray, adv:np.ndarray):
         self.returns[:] = returns
         self.adv[:] = adv
     

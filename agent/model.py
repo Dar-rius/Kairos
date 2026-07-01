@@ -91,17 +91,19 @@ class Agent(nn.Module):
         context = torch.cat([micro_feat, current_belief_probs, current_change_probs, pos_type, p_value], dim=1)
         action_logits = self.actor_layer(context)
         value = self.critic(context)
-        return action_logits, value, belief_logits, change_logits
+        return (action_logits, value, belief_logits,
+                change_logits, current_belief_probs,
+                current_change_probs)
 
     def get_action_and_value(self, micro_x:Tensor, macro_x:Tensor, pos_type:Tensor, p_value:Tensor, action:int=None):
-        actor_logits, value, belief_logits, change_logits = self.forward(micro_x, macro_x, pos_type, p_value)
+        actor_logits, value, belief_logits, change_logits, belief_prob, change_prob = self.forward(micro_x, macro_x, pos_type, p_value)
         probs = Categorical(logits=actor_logits)
         if action is None: action = probs.sample() 
         log_prob = probs.log_prob(action)
         dist_entropy = probs.entropy()
-        belief_prob = torch.softmax(belief_logits, dim=-1)
-        change_prob = torch.sigmoid(change_logits)
-        return action, log_prob, dist_entropy, value, belief_logits, change_logits, belief_prob, change_prob, actor_logits
+        return (action, log_prob, dist_entropy,
+                value, belief_logits, change_logits,
+                belief_prob, change_prob, actor_logits)
 
 # FocalLoss
 class FocalLoss(nn.Module):
@@ -112,7 +114,7 @@ class FocalLoss(nn.Module):
         # Alpha permet de garder les poids de classes si on le souhaite
         self.alpha = alpha 
 
-    def forward(self, inputs, targets):
+    def forward(self, inputs:Tensor, targets:Tensor):
         ce_loss = F.cross_entropy(inputs, targets, weight=self.alpha, reduction='none')
         pt = torch.exp(-ce_loss)
         # Application de l'équation de la Focal Loss

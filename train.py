@@ -98,7 +98,7 @@ with wandb.init(project=PROJECT, config=config) as run:
         for step in range(ROLLOUT_STEPS):
             global_step += 1
             macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
-            with torch.no_grad():
+            with torch.inference_mode():
                 action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t, belief_probs)
@@ -154,7 +154,7 @@ with wandb.init(project=PROJECT, config=config) as run:
         hold_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
         buy_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
         sharpe =  calcul_sharpe_ratio(portfolio_history_np)
-        mdd = calcul_max_dd(portfolio_history_np)
+        mdd = calcul_mdd(portfolio_history_np)
 
         rewards_list = buffer.rewards
         values_list = buffer.values
@@ -162,8 +162,8 @@ with wandb.init(project=PROJECT, config=config) as run:
         regime_pred = buffer.beliefs
         regime_truth = buffer.target_regimes
         #Calcul the GAE
-        with torch.no_grad():
-            correct_regimes = (regime_pred == regime_truth).float().mean().item()
+        with torch.inference_mode():
+            correct_regimes = (regime_pred == regime_truth).mean().item()
         returns, adv, delta = trainer.compute_gae(rewards_list, values_list, last_value, dones_list)
         buffer.insert_returns(returns, adv)
         
