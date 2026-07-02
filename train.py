@@ -13,11 +13,12 @@ from tqdm import tqdm
 from visualizer import Visualizer
 
 # Config
-DEVICE = "cuda:0"
+DEVICE = "cuda:0" if torch.cuda.is_available() else 'cpu'
 DATA_PATH = './data_off/train_test/'
 MODEL_PATH = "./agent/save"
 PROJECT = 'Kairos'
-print(f"Training on: {DEVICE}")
+
+print(f"Device is: {DEVICE}")
 
 # PPO hyper-param
 LR = 3e-5
@@ -112,9 +113,9 @@ with wandb.init(project=PROJECT, config=config) as run:
             
             #Insert data in buffer and variables
             buffer.insert(
-                micro_state=micro_t,
-                macro_state=macro_t,
-                pos_type=pos_t,
+                micro_state=micro_obs,
+                macro_state=macro_obs,
+                pos_type=pos_obs,
                 action=action_t.item(),
                 old_log_prob=log_prob_t,
                 reward=reward,

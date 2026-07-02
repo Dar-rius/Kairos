@@ -132,6 +132,6 @@ wandbc = WeightsAndBiasesCallback(metric="reward", wandb_kwargs=wanbd_kwargs)
 study = optuna.create_study(direction = 'maximize',
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=50 callbacks=[wandbc])
+study.optimize(objective, n_trials=50, callbacks=[wandbc])
 wandb.finish()
 print(study.best_params)

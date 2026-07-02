@@ -51,6 +51,7 @@ def gen_metric(y_true:deque[int], y_pred:deque[int], class_names:list):
 
 
 #Config
+DEVICE = 'cuda:0'
 DATA_PATH = './data_off/train_test/'
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
 train_target_belief = pd.read_csv(f"{DATA_PATH}regime_pretrain.csv").iloc[:, 1:]

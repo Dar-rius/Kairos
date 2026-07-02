@@ -23,7 +23,7 @@ price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
 usd_amount = 10000.0
 
 # Initialize the environment
-env = Env(micro_states, macro_states, price_series, amount_usd=usd_amount, use_scaler=True)
+env = Env(micro_states, macro_states, price_series, amount_usd=usd_amount)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 n_days = 0

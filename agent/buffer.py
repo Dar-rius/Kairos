@@ -38,7 +38,7 @@ class Buffer:
     def insert(self, 
                micro_state:np.ndarray,
                macro_state:np.ndarray,
-               pos_type:list,
+               pos_type:np.ndarray,
                action:int,
                old_log_prob:float,
                reward:float,

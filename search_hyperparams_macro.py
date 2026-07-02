@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 import numpy as np
 import wandb
+from model.agent import MacroHead, FocalLoss
 from torch import optim
 from sklearn.metrics import f1_score
 from sklearn.model_selection import TimeSeriesSplit
@@ -12,12 +13,17 @@ from optuna.integration.wandb import WeightsAndBiasesCallback
 
 
 #Config
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 DATA_PATH = './data_off/train_test/'
 MAT_CONF_PATH = "./runs/train_macro"
 MODEL_PATH = "./agent/save"
-EPOCHS = 30         
+EPOCHS = 30
 BATCH_SIZE = 64
 NUM_TRIALS = 50
+
+#set all tensor to a specific device
+torch.set_default_device(DEVICE)
+print(DEVICE)
 
 # Chargement des données
 train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
@@ -87,7 +93,7 @@ def objective(trial):
         x_val_tensor = torch.FloatTensor(X_val_scaled)
 
         # Initialize class model
-        model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
+        model = MacroHead(macro_dim=MACRO_DIM)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         criterion_belief = FocalLoss(alpha=belief_weights, gamma=2.0)
