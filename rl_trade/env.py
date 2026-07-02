@@ -14,14 +14,13 @@ from sklearn.preprocessing import StandardScaler
 class Env():
     def __init__(self, micro_state:pd.DataFrame, macro_state:pd.DataFrame,
                  price:pd.Series, regime_pred:pd.Series=None, change_pred:pd.Series=None,
-                 amount_usd:float=100000.0, cost_rate:float=0.001, use_scaler:bool=False
+                 amount_usd:float=100000.0, cost_rate:float=0.001
                  ):
         self.init_usd_amount = amount_usd
         self.cash = self.init_usd_amount
         self.btc_shorted = 0.0
         self.btc_held = 0.0
         self.btc_value = 0.0
-        self.use_scaler = use_scaler
         self.micro_scaler = StandardScaler()
         self.micro_state = self.micro_scaler.fit_transform(micro_state)
         self.macro_scaler = joblib.load("./agent/save/macro_scaler.pkl")

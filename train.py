@@ -44,7 +44,7 @@ ROLLOUT_STEPS = 2048
 NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
 
 # Initialize classes
-env = Env(micro_states, macro_states, price_series, regime_series, change_series, use_scaler=True)
+env = Env(micro_states, macro_states, price_series, regime_series, change_series)
 # Visualizer for actions based on his predictions regime
 viz = Visualizer()
 ACTION_DIM = env.action_space
