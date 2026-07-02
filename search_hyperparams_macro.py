@@ -1,20 +1,14 @@
-import os
-import joblib
 import optuna
-import datetime
 import torch
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import wandb
 from torch import optim
-from sklearn.metrics import confusion_matrix, classification_report, f1_score
+from sklearn.metrics import f1_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, classification_report
-from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import TensorDataset, DataLoader
-from collections import deque
+from optuna.integration.wandb import WeightsAndBiasesCallback
 
 
 #Config
@@ -128,10 +122,17 @@ def objective(trial):
     avg_f1 = (np.mean(all_belief_f1) + np.mean(all_change_f1)) / 2.0
     return avg_f1
 
+#Initialize the WandbCallback
+wandb_kwargs = {
+        "project": "kairos",
+        "name": "search_hyperparam_macro"
+                }
+wandbc = WeightsAndBiasesCallback(metric_name="f1_score", wandb_kwargs=wandb_kwargs)
+
 #Create a new dashboard in optuna dashboard 
 study = optuna.create_study(direction = 'maximize',
-                            storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=150)
+study.optimize(objective, n_trials=100, callbacks=[wandbc])
+wandb.finish()
 print(study.best_params)

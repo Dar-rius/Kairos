@@ -2,13 +2,14 @@ import torch
 import numpy as np
 import pandas as pd
 import optuna 
+import wandb
 from rl_trade.env import Env
 from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from collections import deque
-
+from optuna.integration.wandb import WeightsAndBiasesCallback
 
 #Config
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -120,10 +121,17 @@ def objective(trial):
             raise optuna.exceptions.TrialPruned()
     return  np.mean(rewards_)
 
+#Wandb Callback
+wandb_kwargs = {
+        "project": "Kairos",
+        "name": "search-hyperparam-agent"
+        }
+wandbc = WeightsAndBiasesCallback(metric="reward", wandb_kwargs=wanbd_kwargs)
+
 # Create a new datashboard in optuna dashboard
 study = optuna.create_study(direction = 'maximize',
-                            storage="sqlite:///db.sqlite3",
                             sampler=optuna.samplers.TPESampler(),
                             pruner=optuna.pruners.MedianPruner())
-study.optimize(objective, n_trials=50, n_jobs=4)
+study.optimize(objective, n_trials=50 callbacks=[wandbc])
+wandb.finish()
 print(study.best_params)
