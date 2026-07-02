@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:25.08-py3
+FROM nvcr.io/nvidia/pytorch:25.03-py3
 
 WORKDIR /kairos
 
