@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+from config import TrainConfig, MacroConfig
 from sklearn.metrics import confusion_matrix, classification_report, f1_score
 from torch import Tensor
 from agent.model import MacroHead, FocalLoss
@@ -50,20 +51,15 @@ def gen_metric(y_true:deque[int], y_pred:deque[int], class_names:list):
     print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
 
 
-#Config
-DEVICE = 'cuda:0'
-DATA_PATH = './data_off/train_test/'
-train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
-train_target_belief = pd.read_csv(f"{DATA_PATH}regime_pretrain.csv").iloc[:, 1:]
-train_target_change = pd.read_csv(f"{DATA_PATH}change_pretrain.csv").iloc[:, 1:]
+# confusion matrix path
 MAT_CONF_PATH = "./runs/train_macro"
-MODEL_PATH = "./agent/save"
 
-#Training variables
-LR = 0.003850091902319146
-EPOCHS = 30
-BATCH_SIZE = 64
-MACRO_DIM = train_feature_set.shape[1]
+#Config
+train_config =  TrainConfig(batch_size=32)
+macro_config = MacroConfig()
+
+# Model ouput dim
+MACRO_DIM = train_config.data_pretrain["feature"].shape[1]
 
 #The train historic
 all_y_belief_true : deque[int] = deque()
@@ -77,8 +73,14 @@ class_names_change = ['NO CHANGE (0)', 'CHANGE (1)']
 tscv = TimeSeriesSplit(n_splits=10)
 
 #Merge the target of all auxilliary task with the main dataset
-df_full = pd.merge(train_feature_set, train_target_belief, left_index=True, right_index=True)
-df_full = pd.merge(df_full, train_target_change , left_index=True, right_index=True)
+df_full = pd.merge(train_config.data_pretrain["feature"],
+                   train_config.data_pretrain["regime"],
+                   left_index=True,
+                   right_index=True)
+df_full = pd.merge(df_full,
+                   train_config.data_pretrain["change"],
+                   left_index=True,
+                   right_index=True)
 
 #Shift values up by one row to get  the t+1 step
 df_full["regime"] = df_full["regime"].shift(-1)
@@ -101,8 +103,8 @@ y_change = df_final['change'].values.astype(np.int64)
 fold = 0
 
 #Weighted the class of each class
-weights_tensor_belief = torch.FloatTensor([1., 0.8835228721407905, 0.9362682099573649])
-weights_tensor_change = torch.FloatTensor([1., 0.981713583978431])
+weights_tensor_belief = torch.FloatTensor(macro_config.class_weights_belief)
+weights_tensor_change = torch.FloatTensor(macro_config.class_weights_change)
 
 #Pipeline Train
 for train_index, val_index in tscv.split(X):
@@ -122,7 +124,7 @@ for train_index, val_index in tscv.split(X):
     train_tensor = TensorDataset(torch.FloatTensor(X_train_scaled), 
                                  torch.LongTensor(y_train_belief), 
                                  torch.LongTensor(y_train_change))
-    train_loader = DataLoader(train_tensor, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader = DataLoader(train_tensor, batch_size=train_config.batch_size, shuffle=True)
     x_val_tensor = torch.FloatTensor(X_val_scaled)
 
     #Initialize the errors evaluator
@@ -130,11 +132,11 @@ for train_index, val_index in tscv.split(X):
     criterion_change = FocalLoss(alpha=weights_tensor_change)
     
     model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=6.734119081882703e-06)
+    optimizer = optim.Adam(model.parameters(), lr=macro_config.lr, weight_decay=6.734119081882703e-06)
     
     #Start train model
     model.train()
-    for epoch in range(EPOCHS):
+    for epoch in range(macro_config.epochs):
         for batch_x, batch_y_belief, batch_y_change in train_loader:
             optimizer.zero_grad()
             _, belief_logit, change_logit = model(batch_x)
@@ -177,14 +179,14 @@ gen_conf_matrix(all_y_change_true, all_y_change_pred, f"{MAT_CONF_PATH}/change",
 scaler = StandardScaler()
 x_full_final = scaler.fit_transform(X)
 train_tensor_final = TensorDataset(torch.FloatTensor(x_full_final), torch.LongTensor(y_belief), torch.LongTensor(y_change))
-train_loader_final = DataLoader(train_tensor_final, batch_size=BATCH_SIZE, shuffle=True)
+train_loader_final = DataLoader(train_tensor_final, batch_size=train_config.batch_size, shuffle=True)
 
 final_macro_head = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
-final_optimizer = optim.Adam(final_macro_head.parameters(), lr=LR)
+final_optimizer = optim.Adam(final_macro_head.parameters(), lr=macro_config.lr)
 
 #Start train
 final_macro_head.train()
-for epoch in range(EPOCHS):
+for epoch in range(macro_config.epochs):
     for batch_x, batch_y_belief, batch_y_change in train_loader_final:
         final_optimizer.zero_grad()
         _, logit_belief, logit_change = final_macro_head(batch_x)
@@ -194,10 +196,10 @@ for epoch in range(EPOCHS):
         global_loss.backward()
         final_optimizer.step()
 
-if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
+if not os.path.exists(train_config.model_path): os.makedirs(train_config.model_path)
 # Save model
-torch.save(final_macro_head.state_dict(), f'{MODEL_PATH}/macro_head.pt')
-print(f"Model is saved in: {MODEL_PATH}/macro_head.pt")
+torch.save(final_macro_head.state_dict(), f'{train_config.model_path}/macro_head.pt')
+print(f"Model is saved in: {train_config.model_path}/macro_head.pt")
 
-joblib.dump(scaler, f'{MODEL_PATH}/macro_scaler.pkl')
-print(f"Scaler is saved: {MODEL_PATH}/macro_scaler.pkl")
+joblib.dump(scaler, f'{train_config.model_path}/macro_scaler.pkl')
+print(f"Scaler is saved: {train_config.model_path}/macro_scaler.pkl")

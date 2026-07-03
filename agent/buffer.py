@@ -16,10 +16,9 @@ class Buffer:
     9 -> Target Regime
     10 -> Target Change
     """
-    def __init__(self, step:int, micro_size:int, macro_size:int, device:str):
+    def __init__(self, step:int, micro_size:int, macro_size:int):
         self.step = step
         self.slice: int = 0
-        self.device = device
         self.micro_states = np.zeros((self.step, 24, micro_size))
         self.macro_states = np.zeros((self.step, macro_size))
         self.pos_type = np.zeros((self.step, 3))
@@ -68,20 +67,20 @@ class Buffer:
     
     # sampling data
     def get_all(self) -> tuple:
-        return (torch.tensor(self.micro_states, dtype=torch.float32, device=self.device),
-                torch.tensor(self.macro_states, dtype=torch.float32, device=self.device),
-                torch.tensor(self.pos_type, dtype=torch.long, device=self.device),
-                torch.tensor(self.actions, dtype=torch.long, device=self.device),
-                torch.tensor(self.old_log_probs, dtype=torch.float32, device=self.device),
-                torch.tensor(self.returns, dtype=torch.float32, device=self.device),
-                torch.tensor(self.adv, dtype=torch.float32, device=self.device),
-                torch.tensor(self.rewards, dtype=torch.float32, device=self.device),
-                torch.tensor(self.values, dtype=torch.float32, device=self.device),
-                torch.tensor(self.dones, dtype=torch.long, device=self.device),
-                torch.tensor(self.target_regimes, dtype=torch.long, device=self.device),
-                torch.tensor(self.target_changes, dtype=torch.long,  device=self.device),
-                torch.tensor(self.beliefs, dtype=torch.long, device=self.device),
-                torch.tensor(self.portfolio, dtype=torch.float32, device=self.device))
+        return (torch.tensor(self.micro_states, dtype=torch.float32),
+                torch.tensor(self.macro_states, dtype=torch.float32),
+                torch.tensor(self.pos_type, dtype=torch.long),
+                torch.tensor(self.actions, dtype=torch.long),
+                torch.tensor(self.old_log_probs, dtype=torch.float32),
+                torch.tensor(self.returns, dtype=torch.float32),
+                torch.tensor(self.adv, dtype=torch.float32),
+                torch.tensor(self.rewards, dtype=torch.float32),
+                torch.tensor(self.values, dtype=torch.float32),
+                torch.tensor(self.dones, dtype=torch.long),
+                torch.tensor(self.target_regimes, dtype=torch.long),
+                torch.tensor(self.target_changes, dtype=torch.long),
+                torch.tensor(self.beliefs, dtype=torch.long),
+                torch.tensor(self.portfolio, dtype=torch.float32))
 
     # Delete all data
     def clear(self):

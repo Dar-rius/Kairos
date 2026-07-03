@@ -3,6 +3,7 @@ import wandb
 import torch
 import numpy as np
 import pandas as pd
+from config import PPOConfig, TrainConfig, WandbConfig
 from collections import deque
 from rl_trade.env import Env
 from rl_trade.compute import calcul_sharpe_ratio, calcul_mdd
@@ -12,78 +13,57 @@ from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from visualizer import Visualizer
 
-# Config
-DEVICE = "cuda:0" if torch.cuda.is_available() else 'cpu'
-DATA_PATH = './data_off/train_test/'
-MODEL_PATH = "./agent/save"
-PROJECT = 'Kairos'
+#Initt
+ppo_config = PPOConfig()
+train_config = TrainConfig()
+log_config = {
+        'epochs': train_config.num_update,
+        'lr': ppo_config.lr,
+        'gamma': ppo_config.gamma,
+        'gae_lambda': ppo_config.gae_lambda,
+        'clip_eps': ppo_config.clip_eps,
+        'ent_coef': ppo_config.ent_coef,
+        'value_coef': ppo_config.value_coef,
+        'belief_coef': ppo_config.belief_coef,
+        'change_coef': ppo_config.change_coef 
+        }
+wandb_config = WandbConfig(logs=log_config)
 
-print(f"Device is: {DEVICE}")
-
-# PPO hyper-param
-LR = 3e-5
-GAMMA = 0.999
-GAE_LAMBDA = 0.95
-CLIP_EPS = 0.1
-ENT_COEF = 0.001
-VALUE_COEF = 0.5
-BELIEF_COEF = 0.3
-CHANGE_COEF = 0.5
-
-# Load data
-micro_states = pd.read_csv(f"{DATA_PATH}daily_train.csv").iloc[:, 1:]
-macro_states = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
-price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
-regime_series = pd.read_csv(f"{DATA_PATH}regime_train.csv")["regime"]
-change_series = pd.read_csv(f"{DATA_PATH}change_train.csv")["change"]
-
-# Training parameters 
-TOTAL_TIMESTAMP = 3000000
-BATCH_SIZE = 64
-ROLLOUT_STEPS = 2048
-NUM_UPDATE = TOTAL_TIMESTAMP // ROLLOUT_STEPS
+# set all tensor to device
+torch.set_default_device(train_config.device)
 
 # Initialize classes
-env = Env(micro_states, macro_states, price_series, regime_series, change_series)
+env = Env(train_config.data_train["micro"],
+          train_config.data_train["macro"],
+          train_config.data_train["price"],
+          train_config.data_train["regime"],
+          train_config.data_train["change"])
 # Visualizer for actions based on his predictions regime
 viz = Visualizer()
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 #Load macro-head wieght
-macro_head =  MacroHead(STATE_DIM[1]).to(DEVICE)
+macro_head =  MacroHead(STATE_DIM[1])
 macro_head.load_state_dict(torch.load("./agent/save/macro_head.pt", weights_only=True))
-agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
+agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM)
 trainer = PPOTrainer(agent,
-                     lr=LR,
-                     gamma=GAMMA,
-                     gae_lambda=GAE_LAMBDA,
-                     ent_coef=ENT_COEF,
-                     value_coef=VALUE_COEF,
-                     belief_coef=BELIEF_COEF,
-                     change_coef=CHANGE_COEF,
-                     device=DEVICE)
-buffer = Buffer(ROLLOUT_STEPS, STATE_DIM[0], STATE_DIM[1], DEVICE)
+                     lr=ppo_config.lr,
+                     gamma=ppo_config.gamma,
+                     gae_lambda=ppo_config.gae_lambda,
+                     ent_coef=ppo_config.ent_coef,
+                     value_coef=ppo_config.value_coef,
+                     belief_coef=ppo_config.belief_coef,
+                     change_coef=ppo_config.change_coef)
+buffer = Buffer(train_config.rollout_steps, STATE_DIM[0], STATE_DIM[1])
 
-# Wandb configuration
-config = {
-        'epochs': NUM_UPDATE,
-        'lr': LR,
-        'gamma': GAMMA,
-        'gae_lambda': GAE_LAMBDA,
-        'clip_eps': CLIP_EPS,
-        'ent_coef': ENT_COEF,
-        'value_coef': VALUE_COEF,
-        'belief_coef': BELIEF_COEF,
-        'change_coef': CHANGE_COEF
-        }
 wandb.login()
 
 micro_obs, macro_obs, pos_obs = env.reset()
 global_step = 0
 
 # Training Loop
-with wandb.init(project=PROJECT, config=config) as run:
-    for update in tqdm(range(1, NUM_UPDATE + 1)):
+with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
+    for update in tqdm(range(1, train_config.num_update + 1)):
         # Variables that stored train historic
         cumulative_reward = 0.0
         cumulative_pnl = 0.0
@@ -96,9 +76,9 @@ with wandb.init(project=PROJECT, config=config) as run:
         stop = False
 
         # Rollout phase
-        for step in range(ROLLOUT_STEPS):
+        for step in range(train_config.rollout_steps):
             global_step += 1
-            macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
+            macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value)
             with torch.inference_mode():
                 action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
 
@@ -144,7 +124,7 @@ with wandb.init(project=PROJECT, config=config) as run:
         else:
             #Collect the last critric value
             with torch.inference_mode():
-                macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
+                macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value)
                 _, _, _, next_value, _, _, _, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
                 last_value = next_value.item()
 
@@ -152,9 +132,9 @@ with wandb.init(project=PROJECT, config=config) as run:
         portfolio_history_np = np.array(portfolio_history)
         btc_history_np = np.array(btc_history) 
         #Calcul the market metrics
-        short_pct = (action_counts[0] / ROLLOUT_STEPS) * 100
-        hold_pct = (action_counts[1] / ROLLOUT_STEPS) * 100
-        buy_pct = (action_counts[2] / ROLLOUT_STEPS) * 100
+        short_pct = (action_counts[0] / train_config.rollout_steps) * 100
+        hold_pct = (action_counts[1] / train_config.rollout_steps) * 100
+        buy_pct = (action_counts[2] / train_config.rollout_steps) * 100
         sharpe =  calcul_sharpe_ratio(portfolio_history_np)
         mdd = calcul_mdd(portfolio_history_np)
 
@@ -170,7 +150,9 @@ with wandb.init(project=PROJECT, config=config) as run:
             correct_regimes = (np.argmax(regime_pred, axis=-1) == regime_truth).mean().item()
         
         #Update the weights
-        loss, policy_loss, value_loss, belief_loss, change_loss, entropy = trainer.update(buffer, TOTAL_TIMESTAMP, step, BATCH_SIZE)
+        (loss, policy_loss, value_loss,
+         belief_loss, change_loss, entropy) = trainer.update(buffer, train_config.timestamp, step, train_config.batch_size)
+        
         #create scatter visualization
         scatter = viz.log_belief_scatter(buffer)
         # Clean buffer
@@ -193,6 +175,6 @@ with wandb.init(project=PROJECT, config=config) as run:
                  'Belief Accuracy': correct_regimes})
 
 #Save model
-if not os.path.exists(MODEL_PATH): os.makedirs(MODEL_PATH)
+if not os.path.exists(train_config.model_path): os.makedirs(train_config.model_path)
 torch.save(agent.state_dict(), './agent/save/agent_saved.pt')
 torch.save(macro_head.state_dict(), './agent/save/macro_head_postrained.pt')

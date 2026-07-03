@@ -177,12 +177,12 @@ class Env():
         self._all_reset(train)
         return self.new_state()
 
-    def convert_to_tensor(self, macro_state:np.ndarray, micro_state:np.ndarray, pos_type:np.ndarray, p_value:float, device:str) -> tuple:
+    def convert_to_tensor(self, macro_state:np.ndarray, micro_state:np.ndarray, pos_type:np.ndarray, p_value:float) -> tuple:
         return (
-                torch.tensor(macro_state, dtype=torch.float32, device=device).unsqueeze(0),
-                torch.tensor(micro_state, dtype=torch.float32, device=device).unsqueeze(0),
-                torch.tensor(pos_type, dtype=torch.long, device=device).unsqueeze(0),
-                torch.tensor(p_value, dtype=torch.float32, device=device).unsqueeze(0)
+                torch.tensor(macro_state, dtype=torch.float32).unsqueeze(0),
+                torch.tensor(micro_state, dtype=torch.float32).unsqueeze(0),
+                torch.tensor(pos_type, dtype=torch.long).unsqueeze(0),
+                torch.tensor(p_value, dtype=torch.float32).unsqueeze(0)
                 )
 
     # The next step

@@ -17,9 +17,9 @@ DATA_PATH = './data_off/train_test/'
 GRAPH_PATH = "./runs/test"
 
 # Load data
-micro_states = pd.read_csv(f"{DATA_PATH}price_test.csv").iloc[:, 1:]
-macro_states = pd.read_csv(f"{DATA_PATH}metric_test.csv").iloc[:, 1:]
-price_series = pd.read_csv(f"{DATA_PATH}price_close_test.csv")["Close"]
+micro_states = pd.read_csv(f"{DATA_PATH}/daily_test.csv").iloc[:, 1:]
+macro_states = pd.read_csv(f"{DATA_PATH}/metric_test.csv").iloc[:, 1:]
+price_series = pd.read_csv(f"{DATA_PATH}/price_close_test.csv")["Close"]
 usd_amount = 10000.0
 
 # Initialize the environment
