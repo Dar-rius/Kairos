@@ -9,8 +9,8 @@ if not os.path.exists(PATH_EXIST):
     market_metric_pretrain = pd.read_csv("./data_off/train_test/metric_pretrain.csv")
     market_metric_train = pd.read_csv("./data_off/train_test/metric_train.csv")
     market_metric_test = pd.read_csv("./data_off/train_test/metric_test.csv")
-    price_train_series = pd.read_csv("./data_off/train_test/price_train.csv")
-    price_test_series = pd.read_csv("./data_off/train_test/price_test.csv")
+    daily_train_series = pd.read_csv("./data_off/train_test/price_train.csv")
+    daily_test_series = pd.read_csv("./data_off/train_test/price_test.csv")
 
     #Encode regime class from str to int
     regime_mapping = {
@@ -23,23 +23,29 @@ if not os.path.exists(PATH_EXIST):
         dataset["regime"] = dataset["regime"].astype(int)
 
 
-    #Process dataset for training price
-    price_close_train = price_train_series["Close"]
+    #Process micro trade dataset for train
+    price_close_train = daily_train_series["Close"]
     price_close_train.to_csv("./data_off/train_test/price_close_train.csv")
 
-    price_train_series =  price_train_series.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
-    price_train_series.to_csv("./data_off/train_test/price_train.csv")
+    daily_train_series =  daily_train_series.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
+    daily_train_series.to_csv("./data_off/train_test/daily_train.csv")
+
+    #Delete price_train and price_train
+    os.remove("./data_off/train_test/price_train.csv")
 
 
-    #Process dataset for testing price
-    price_close_test = price_test_series["Close"]
+    #Process micro trade dataset for test
+    price_close_test = daily_test_series["Close"]
     price_close_test.to_csv("./data_off/train_test/price_close_test.csv")
 
-    price_test_series =  price_test_series.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
-    price_test_series.to_csv("./data_off/train_test/price_test.csv")
+    daily_test_series =  daily_test_series.drop(["Datetime_utc","Open","High","Low","Close","Volume"], axis = 1)
+    daily_test_series.to_csv("./data_off/train_test/daily_test.csv")
+
+    #Delete price_train and price_test
+    os.remove("./data_off/train_test/price_test.csv")
 
 
-    #Process dataset for pre-training macro state
+    #Process macro trade dataset for pre-train
     market_regime_pretrain = market_metric_pretrain["regime"]
     market_regime_pretrain.to_csv("./data_off/train_test/regime_pretrain.csv")
 
@@ -50,7 +56,7 @@ if not os.path.exists(PATH_EXIST):
     market_metric_pretrain.to_csv("./data_off/train_test/metric_pretrain.csv")
 
 
-    #Process dataset for training macro state
+    #Process macro trade dataset for train
     market_regime_train = market_metric_train["regime"]
     market_regime_train.to_csv("./data_off/train_test/regime_train.csv")
 
@@ -61,7 +67,7 @@ if not os.path.exists(PATH_EXIST):
     market_metric_train.to_csv("./data_off/train_test/metric_train.csv")
 
 
-    #Process dataset for testing macro state
+    #Process macro trade dataset for test
     market_regime_test = market_metric_test["regime"]
     market_regime_test.to_csv("./data_off/train_test/regime_test.csv")
 

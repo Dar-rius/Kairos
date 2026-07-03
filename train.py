@@ -31,7 +31,7 @@ BELIEF_COEF = 0.3
 CHANGE_COEF = 0.5
 
 # Load data
-micro_states = pd.read_csv(f"{DATA_PATH}price_train.csv").iloc[:, 1:]
+micro_states = pd.read_csv(f"{DATA_PATH}daily_train.csv").iloc[:, 1:]
 macro_states = pd.read_csv(f"{DATA_PATH}metric_train.csv").iloc[:, 1:]
 price_series = pd.read_csv(f"{DATA_PATH}price_close_train.csv")["Close"]
 regime_series = pd.read_csv(f"{DATA_PATH}regime_train.csv")["regime"]
