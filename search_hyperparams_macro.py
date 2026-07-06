@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 import numpy as np
 import wandb
+from config import TrainConfig, MacroConfig 
 from model.agent import MacroHead, FocalLoss
 from torch import optim
 from sklearn.metrics import f1_score
@@ -12,27 +13,22 @@ from torch.utils.data import TensorDataset, DataLoader
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
 
-#Config
-DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-DATA_PATH = './data_off/train_test/'
-MAT_CONF_PATH = "./runs/train_macro"
-MODEL_PATH = "./agent/save"
-EPOCHS = 30
-BATCH_SIZE = 64
-NUM_TRIALS = 50
+# Initialize config
+train_config  = TrainConfig()
+macro_config = MacroConfig()
 
 #set all tensor to a specific device
-torch.set_default_device(DEVICE)
-print(DEVICE)
+torch.set_default_device(train_config.device)
 
-# Chargement des données
-train_feature_set = pd.read_csv(f"{DATA_PATH}metric_pretrain.csv").iloc[:, 1:]
-train_target_regime = pd.read_csv(f"{DATA_PATH}regime_pretrain.csv").iloc[:, 1:]
-train_target_change = pd.read_csv(f"{DATA_PATH}change_pretrain.csv").iloc[:, 1:]
-
-
-df_full = pd.merge(train_feature_set, train_target_regime, left_index=True, right_index=True)
-df_full = pd.merge(df_full, train_target_change , left_index=True, right_index=True)
+#Merge the target of all auxilliary task with the main dataset
+df_full = pd.merge(train_config.data_pretrain["feature"],
+                   train_config.data_pretrain["regime"],
+                   left_index=True,
+                   right_index=True)
+df_full = pd.merge(df_full,
+                   train_config.data_pretrain["change"],
+                   left_index=True,
+                   right_index=True)
 
 #Shift values up by one row to get  the t+1 step
 df_full["regime"] = df_full["regime"].shift(-1)
@@ -101,7 +97,7 @@ def objective(trial):
 
         # Start Training
         model.train()
-        for _ in range(EPOCHS):
+        for _ in range(macro_config.epochs):
             for batch_x, batch_y_b, batch_y_c in train_loader:
                 optimizer.zero_grad()
                 _, regime_logits, change_logits = model(batch_x)
