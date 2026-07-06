@@ -85,7 +85,7 @@ def objective(trial):
             torch.LongTensor(y_train_belief),
             torch.LongTensor(y_train_change)
         )
-        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=train_config.batch_size, shuffle=True)
         x_val_tensor = torch.FloatTensor(X_val_scaled)
 
         # Initialize class model
