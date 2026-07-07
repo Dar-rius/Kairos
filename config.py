@@ -10,7 +10,7 @@ class PPOConfig:
     gamma: float = 0.999
     gae_lambda: float = 0.95
     clip_eps: float = 0.1
-    ent_coef: float = 0.001
+    ent_coef: float = 0.01
     value_coef: float = 0.5
     belief_coef: float = 0.1
     change_coef: float = 0.1
