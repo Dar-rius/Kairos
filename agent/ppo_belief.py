@@ -80,7 +80,6 @@ class PPOTrainer:
 
         for _ in range(epochs):
             shuffle_index = batch_rollout[torch.randperm(num_batch)]
-            print(shuffle_index)
             for start in shuffle_index:
                 end = start + batch_size
                 idx = torch.arange(start, end)
