@@ -6,7 +6,7 @@ ENV TORCH_CUDA_ARCH_LIST="6.1;7.5;8.0;8.6;8.9;9.0;12.0"
 
 COPY requirements.txt .
 
-RUN pip install --force-reinstall numpy==1.26.4 wandb && \
+RUN pip install wandb && \
     pip install -r requirements.txt 
 
 RUN pip uninstall numpy -y && \

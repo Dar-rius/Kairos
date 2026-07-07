@@ -19,7 +19,7 @@ def reward_func(return_:float, belief_probs:np.ndarray, position:int, prev_posit
     
     # Calcul DSR
     numerator = (ema_b * delta_a) - (0.5 * ema_a * delta_b)
-    denominator = np.pow(np.clip(variance, min=0.0) + epsilon, 1.5)
+    denominator = np.power(np.clip(variance, a_min=0.0, a_max=5.0) + epsilon, 1.5)
     dsr = numerator / denominator
     
     #belief_entropy = -torch.sum(belief_probs * torch.log(belief_probs + 1e-8), dim=-1)
