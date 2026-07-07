@@ -4,38 +4,40 @@ import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from rl_trade.env import Env from rl_trade.compute import calcul_sharpe_ratio, calcul_mdd
+from config import TrainConfig
+from rl_trade.env import Env 
+from rl_trade.compute import calcul_sharpe_ratio, calcul_mdd
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from collections import deque
 
 # Config
-DEVICE = "cuda:0"
+train_config = TrainConfig( device='cpu' )
 AGENT_PATH = './agent/save/agent_saved.pt'
 MACRO_WEIGHTS_PATH = './agent/save/macro_head_1.pt'
-DATA_PATH = './data_off/train_test/'
 GRAPH_PATH = "./runs/test"
 
+
 # Load data
-micro_states = pd.read_csv(f"{DATA_PATH}/daily_test.csv").iloc[:, 1:]
-macro_states = pd.read_csv(f"{DATA_PATH}/metric_test.csv").iloc[:, 1:]
-price_series = pd.read_csv(f"{DATA_PATH}/price_close_test.csv")["Close"]
-usd_amount = 10000.0
+micro_states = pd.read_csv(f"{train_config.data_path}/daily_test.csv").iloc[:, 1:]
+macro_states = pd.read_csv(f"{train_config.data_path}/metric_test.csv").iloc[:, 1:]
+price_series = pd.read_csv(f"{train_config.data_path}/price_close_test.csv")["Close"]
+INIT_AMOUNT = 10_000.0
 
 # Initialize the environment
-env = Env(micro_states, macro_states, price_series, amount_usd=usd_amount)
+env = Env(micro_states, macro_states, price_series, amount_usd=INIT_AMOUNT)
 ACTION_DIM = env.action_space
 STATE_DIM = env.observation_space
 n_days = 0
 
 # Load weights
-macro_head = MacroHead(STATE_DIM[1]).to(DEVICE)
+macro_head = MacroHead(STATE_DIM[1])
 print(f"Load model from {AGENT_PATH}...")
 print(f"Load model from {MACRO_WEIGHTS_PATH}...")
-macro_head.load_state_dict(torch.load(MACRO_WEIGHTS_PATH, weights_only=True, map_location=DEVICE))
+macro_head.load_state_dict(torch.load(MACRO_WEIGHTS_PATH, weights_only=True))
 macro_head.eval()
-agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM).to(DEVICE)
-agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True, map_location=DEVICE))
+agent = Agent(macro_head, STATE_DIM[0], action_dim=ACTION_DIM)
+agent.load_state_dict(torch.load(AGENT_PATH, weights_only=True))
 agent.eval()
 
 print("Run the Backtest...")
@@ -55,7 +57,7 @@ total_hours = micro_states.shape[0]
 for t in tqdm(range(total_hours)):
     btc_val = env.btc_value
     p_value = env.calcul_portfolio_value()
-    macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value, DEVICE)
+    macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value)
     with torch.no_grad():
         action_t, _, _, _, _, _, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
     
@@ -116,7 +118,7 @@ plt.scatter(cash_idx, [price_history[i] for i in cash_idx], marker='x', color='b
 # Sub-graph 2: Porfolio Value
 plt.subplot(2, 1, 2)
 plt.plot(portfolio_history, label='Portfolio Value ($)', color='blue')
-plt.axhline(y=usd_amount, color='r', linestyle='--', label='Initial Capital')
+plt.axhline(y=INIT_AMOUNT, color='r', linestyle='--', label='Initial Capital')
 plt.title('Porfolio value evolution')
 plt.legend()
 plt.grid(True)
