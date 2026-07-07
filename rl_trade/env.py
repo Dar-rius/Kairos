@@ -1,12 +1,10 @@
 import pandas as pd
 import numpy as np
-import gymnasium as gym
 import joblib
 import random
 import torch
 from torch import Tensor
-from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_btc, convert_to_usd 
-from gymnasium import spaces
+from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_usd 
 from typing import Any
 from sklearn.preprocessing import StandardScaler
 

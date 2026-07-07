@@ -13,9 +13,9 @@ from agent.model import Agent, MacroHead
 from tqdm import tqdm
 from visualizer import Visualizer
 
-#Initt
-ppo_config = PPOConfig()
-train_config = TrainConfig()
+#Init
+ppo_config = PPOConfig(ent_coef=0.5)
+train_config = TrainConfig( device='cpu' )
 log_config = {
         'epochs': train_config.num_update,
         'lr': ppo_config.lr,
@@ -72,7 +72,7 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
         btc_history: deque[float] = deque()
         action_counts = {0: 0, 1: 0, 2: 0}
         regime_table = wandb.Table(columns=["step", "type", "value"])
-        p_value = env.calcul_portfolio_value()
+        p_value = env.calcul_portfolio_value() / train_config.init_amount
         stop = False
 
         # Rollout phase
@@ -114,11 +114,11 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
 
             if done or truncate:
                 micro_obs, macro_obs, pos_obs = env.reset()
-                p_value = env.calcul_portfolio_value()
+                p_value = env.calcul_portfolio_value() / train_config.init_amount
                 stop = True
             else:
                 micro_obs, macro_obs, pos_obs = next_obs
-                p_value = env.calcul_portfolio_value()
+                p_value = env.calcul_portfolio_value() / train_config.init_amount
         if stop:
             last_value = 0.0
         else:
@@ -130,7 +130,7 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
 
         #Convert list to numpy array
         portfolio_history_np = np.array(portfolio_history)
-        btc_history_np = np.array(btc_history) 
+        btc_history_np = np.array(btc_history)
         #Calcul the market metrics
         short_pct = (action_counts[0] / train_config.rollout_steps) * 100
         hold_pct = (action_counts[1] / train_config.rollout_steps) * 100

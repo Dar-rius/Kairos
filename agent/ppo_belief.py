@@ -18,7 +18,6 @@ class PPOTrainer:
                  belief_coef:float=0.1,
                  change_coef:float=0.1,
                  ent_coef:float=0.01, 
-                 device:str="cpu"
                  ):
         self.model = model
         self.lr = lr
@@ -35,7 +34,6 @@ class PPOTrainer:
         self.mse_loss = nn.MSELoss()
         self.fl_loss = FocalLoss()
         self.bfl_loss = FocalLoss()
-        self.device = device
 
     
     def compute_gae(self, rewards:np.ndarray, values:np.ndarray, last_value:float, dones:np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -71,20 +69,21 @@ class PPOTrainer:
         dataset_size = actions.size(0)
         num_batch = dataset_size // batch_size
         size_total = int((dataset_size / batch_size) * epochs)
-        epoch_losses = torch.zeros((size_total), dtype=torch.float32, device=self.device)
-        epoch_pi_losses = torch.zeros((size_total), device=self.device)
-        epoch_v_losses = torch.zeros((size_total), device=self.device)
-        epoch_b_losses = torch.zeros((size_total), device=self.device)
-        epoch_c_losses = torch.zeros((size_total), device=self.device)
-        epoch_entropies = torch.zeros((size_total), device=self.device)
+        epoch_losses = torch.zeros((size_total), dtype=torch.float32)
+        epoch_pi_losses = torch.zeros((size_total))
+        epoch_v_losses = torch.zeros((size_total))
+        epoch_b_losses = torch.zeros((size_total))
+        epoch_c_losses = torch.zeros((size_total))
+        epoch_entropies = torch.zeros((size_total))
         index_loss = 0
-        batch_rollout = torch.arange(0, dataset_size, batch_size, device=self.device)
+        batch_rollout = torch.arange(0, dataset_size, batch_size)
 
         for _ in range(epochs):
-            shuffle_index = batch_rollout[torch.randperm(num_batch, device=self.device)]
+            shuffle_index = batch_rollout[torch.randperm(num_batch)]
+            print(shuffle_index)
             for start in shuffle_index:
                 end = start + batch_size
-                idx = torch.arange(start, end, device=self.device)
+                idx = torch.arange(start, end)
                 if idx.numel() == 0: continue
 
                 _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(

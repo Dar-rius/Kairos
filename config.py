@@ -29,6 +29,7 @@ class MacroConfig:
 @dataclass
 class TrainConfig:
     device: str = "cuda:0" if torch.cuda.is_available() else "cpu"
+    init_amount: float = 100_000.0
     data_path: str = "./data_off/train_test"
     data_train: dict[str, pd.DataFrame] = field(default_factory=dict)
     data_pretrain: dict[str, pd.DataFrame] = field(default_factory=dict)

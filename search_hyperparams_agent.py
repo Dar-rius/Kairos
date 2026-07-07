@@ -5,7 +5,7 @@ import optuna
 import wandb
 from config import TrainConfig
 from rl_trade.env import Env
-from agent.ppo_belief import PPOTrainer
+from agent.ppo_belief import PPOTrainer, TrainerConfig
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
@@ -13,7 +13,7 @@ from collections import deque
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
 #Config
-train_config = TrainConfig(timestamp=1_000_000)
+train_config = TrainConfig()
 
 #Set device to all tensor
 torch.set_default_device(train_config.device)
