@@ -14,7 +14,7 @@ from optuna.integration.wandb import WeightsAndBiasesCallback
 
 #Config
 train_config = TrainConfig()
-train_config.num_update = 500
+train_config.num_update = 350
 
 #Set device to all tensor
 torch.set_default_device(train_config.device)
@@ -58,7 +58,7 @@ def objective(trial):
     global_step = 0
 
     # Start training
-    for epoch in range(1, train_config.num_update):
+    for epoch in tqdm(range(1, train_config.num_update+1)):
         cumulative_reward = 0.0
         rewards_: deque[float] = deque()
         p_value = env.calcul_portfolio_value() / train_config.init_amount
