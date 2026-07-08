@@ -19,10 +19,10 @@ class PPOConfig:
 #Macro_head train config
 @dataclass
 class MacroConfig:
-    lr: float = 0.003850091902319146
+    lr: float = 0.0052360608601874975
     epochs: int = 30
-    class_weights_belief: tuple[float, float, float] = field(default_factory=lambda: (1., 0.8835228721407905, 0.9362682099573649))
-    class_weights_change: tuple[float, float] = field(default_factory=lambda: (1., 0.981713583978431))
+    class_weights_belief: tuple[float, float, float] = field(default_factory=lambda: (4.756779379784292, 3.310296778893515, 4.197857175781614))
+    class_weights_change: tuple[float, float] = field(default_factory=lambda: (3.768925283008966, 4.039014120358468))
 
 
 #Training default config

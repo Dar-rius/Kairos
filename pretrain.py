@@ -132,7 +132,7 @@ for train_index, val_index in tscv.split(X):
     criterion_change = FocalLoss(alpha=weights_tensor_change)
     
     model = MacroHead(macro_dim=MACRO_DIM, num_regimes=3, num_changes=2)
-    optimizer = optim.Adam(model.parameters(), lr=macro_config.lr, weight_decay=6.734119081882703e-06)
+    optimizer = optim.Adam(model.parameters(), lr=macro_config.lr, weight_decay=0.00023318187318830907)
     
     #Start train model
     model.train()
