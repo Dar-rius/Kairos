@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import wandb
 from config import TrainConfig, MacroConfig 
-from model.agent import MacroHead, FocalLoss
+from agent.model import MacroHead, FocalLoss
 from torch import optim
 from sklearn.metrics import f1_score
 from sklearn.model_selection import TimeSeriesSplit
@@ -16,9 +16,6 @@ from optuna.integration.wandb import WeightsAndBiasesCallback
 # Initialize config
 train_config  = TrainConfig()
 macro_config = MacroConfig()
-
-#set all tensor to a specific device
-torch.set_default_device(train_config.device)
 
 #Merge the target of all auxilliary task with the main dataset
 df_full = pd.merge(train_config.data_pretrain["feature"],
@@ -55,16 +52,20 @@ tscv = TimeSeriesSplit(n_splits=10)
 def objective(trial):
     # Train hyper-params
     lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-    # Belief data weight 2 (volatily)
+    # Belief data weight 0 (volatily)
+    belief_w0 = trial.suggest_float('belief_w0', 0.5, 5.0)
+    # Belief data weight 1 (volatily)
     belief_w1 = trial.suggest_float('belief_w1', 0.5, 5.0)
-    # Belief data weight 3 (crisis)
+    # Belief data weight 2 (crisis)
     belief_w2 = trial.suggest_float('belief_w2', 0.5, 5.0)
-    # Change data weight 2 (yes is changing)
+    # Change data weight 0 (yes is changing)
+    change_w0 = trial.suggest_float('change_w0', 0.5, 5.0)
+    # Change data weight 1 (yes is changing)
     change_w1 = trial.suggest_float('change_w1', 0.5, 5.0)
     weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-3, log=True)
 
-    belief_weights = torch.FloatTensor([1.0, belief_w1, belief_w2])
-    change_weights = torch.FloatTensor([1.0, change_w1])
+    belief_weights = torch.FloatTensor([belief_w0, belief_w1, belief_w2])
+    change_weights = torch.FloatTensor([change_w0, change_w1])
 
     all_belief_f1 = []
     all_change_f1 = []
@@ -81,11 +82,13 @@ def objective(trial):
 
         # Convert dataset to tensor
         train_dataset = TensorDataset(
-            torch.FloatTensor(X_train_scaled),
-            torch.LongTensor(y_train_belief),
-            torch.LongTensor(y_train_change)
+            torch.tensor(X_train_scaled, dtype=torch.float),
+            torch.tensor(y_train_belief, dtype=torch.long),
+            torch.tensor(y_train_change, dtype=torch.long)
         )
-        train_loader = DataLoader(train_dataset, batch_size=train_config.batch_size, shuffle=True)
+        train_loader = DataLoader(train_dataset, 
+                                  batch_size=train_config.batch_size, 
+                                  shuffle=True)
         x_val_tensor = torch.FloatTensor(X_val_scaled)
 
         # Initialize class model
