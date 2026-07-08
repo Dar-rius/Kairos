@@ -41,7 +41,6 @@ class Visualizer:
         if n_points == 0:
             return None
         
-        # Sampling si trop de points (perf wandb)
         if n_points > 3000:
             idx = np.random.choice(n_points, 3000, replace=False)
             beliefs, actions, portfolio = beliefs[idx], actions[idx], portfolio[idx]
@@ -93,7 +92,6 @@ class Visualizer:
         return wandb.Html(fig.to_html(full_html=False, include_plotlyjs='cdn'))
     
     def log_portfolio_timeline(self, buffer):
-        """Timeline portfolio avec zones d'action"""
         _, actions, portfolio = self._get_buffer_data(buffer)
         if portfolio is None or len(portfolio) == 0:
             return None
@@ -104,12 +102,12 @@ class Visualizer:
         starts = np.insert(changes, 0, 0)
         ends = np.append(changes, len(actions))
         
-        # Tracé des zones d'actions
+        # draw actions zone
         for start, end in zip(starts, ends):
             curr_action = actions[start]
             ax.axvspan(start, end - 1, alpha=0.2, color=self.colors[curr_action])
         
-        # Tracé du portfolio
+        # Draw portfolio
         ax.plot(portfolio, color='black', linewidth=2)
         ax.fill_between(range(len(portfolio)), portfolio, alpha=0.1, color='gray')
         
@@ -117,7 +115,7 @@ class Visualizer:
         ax.set_ylabel('Portfolio ($)')
         ax.set_title('Portfolio Evolution')
         
-        # Légende
+        # Legend
         patches = [mpatches.Patch(color=self.colors[i], label=self.labels[i], alpha=0.5) 
                    for i in range(3)]
         ax.legend(handles=patches, loc='upper left')
@@ -130,7 +128,7 @@ class Visualizer:
         return img
     
     def log_regime_action_dist(self, buffer):
-        """Distribution des actions par régime"""
+        """actions distribution by regime"""
         beliefs, actions, _ = self._get_buffer_data(buffer)
         if actions is None or len(actions) == 0:
             return None
@@ -168,7 +166,7 @@ class Visualizer:
         return img
     
     def log_all(self, buffer, global_step=None):
-        """Logue tous les graphes incluant le scatter 3D"""
+        """Log all data about scatter 3d"""
         logs = {}
         
         scatter_3d = self.log_belief_scatter(buffer)
