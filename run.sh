@@ -5,3 +5,4 @@ docker run -it --rm \
        -v $HOME/.secrets/wandb.key:/run/secrets/wandb.key:ro \
        -v $HOME/agent/save:/kairos/agent/save  \
        -v $PWD:/kairos \
+       kairos
