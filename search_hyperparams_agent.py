@@ -5,7 +5,7 @@ import optuna
 import wandb
 from config import TrainConfig
 from rl_trade.env import Env
-from agent.ppo_belief import PPOTrainer, TrainerConfig
+from agent.ppo_belief import PPOTrainer
 from agent.buffer import Buffer
 from agent.model import Agent, MacroHead
 from tqdm import tqdm
@@ -14,6 +14,7 @@ from optuna.integration.wandb import WeightsAndBiasesCallback
 
 #Config
 train_config = TrainConfig()
+train_config.num_update = 500
 
 #Set device to all tensor
 torch.set_default_device(train_config.device)
@@ -53,13 +54,14 @@ def objective(trial):
     #Initialize Buffer
     buffer = Buffer(train_config.rollout_steps, STATE_DIM[0], STATE_DIM[1])
 
-    micro_obs, macro_obs = env.reset()
+    micro_obs, macro_obs, pos_obs = env.reset()
     global_step = 0
 
     # Start training
     for epoch in range(1, train_config.num_update):
         cumulative_reward = 0.0
         rewards_: deque[float] = deque()
+        p_value = env.calcul_portfolio_value() / train_config.init_amount
         stop = False
         # Rollout phase
         for step in range(train_config.rollout_steps):
@@ -73,9 +75,9 @@ def objective(trial):
             
             #Insert data in buffer and variables
             buffer.insert(
-                micro_state=micro_t,
-                macro_state=macro_t,
-                pos_type=pos_t,
+                micro_state=micro_obs,
+                macro_state=macro_obs,
+                pos_type=pos_obs,
                 action=action_t.item(),
                 old_log_prob=log_prob_t,
                 reward=reward,
@@ -90,11 +92,11 @@ def objective(trial):
 
             if done or truncate:
                 micro_obs, macro_obs, pos_obs = env.reset()
-                p_value = env.calcul_portfolio_value()
+                p_value = env.calcul_portfolio_value() / train_config.init_amount
                 stop = True
             else:
                 micro_obs, macro_obs, pos_obs = next_obs
-                p_value = env.calcul_portfolio_value()
+                p_value = env.calcul_portfolio_value() / train_config.init_amount
         if stop:
             last_value = 0.0
         else:
@@ -108,7 +110,7 @@ def objective(trial):
         values_list = buffer.values
         dones_list = buffer.dones
         #Calcul the GAE
-        returns, adv = trainer.compute_gae(rewards_list, values_list,
+        returns, adv, _ = trainer.compute_gae(rewards_list, values_list,
                                            last_value, dones_list)
         buffer.insert_returns(returns, adv)
 
@@ -125,10 +127,10 @@ def objective(trial):
 
 #Wandb Callback
 wandb_kwargs = {
-        "project": "Kairos",
-        "name": "search-hyperparam-agent"
+        "project": "kairos",
+        "name": "search_hyperparam_agent"
         }
-wandbc = WeightsAndBiasesCallback(metric="reward", wandb_kwargs=wandb_kwargs)
+wandbc = WeightsAndBiasesCallback(metric_name="reward", wandb_kwargs=wandb_kwargs)
 
 # Create a new datashboard in optuna dashboard
 study = optuna.create_study(direction = 'maximize',
