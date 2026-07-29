@@ -59,7 +59,6 @@ buffer = Buffer(train_config.rollout_steps, STATE_DIM[0], STATE_DIM[1])
 wandb.login()
 
 micro_obs, macro_obs, pos_obs = env.reset()
-global_step = 0
 
 # Training Loop
 with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
@@ -77,10 +76,9 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
 
         # Rollout phase
         for step in range(train_config.rollout_steps):
-            global_step += 1
             macro_t, micro_t, pos_t, p_value_t = env.convert_to_tensor(macro_obs, micro_obs, pos_obs, p_value)
             with torch.inference_mode():
-                action_t, log_prob_t, entropy_t, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
+                action_t, log_prob_t, _, value_t, belief_logits, change_logits, belief_probs, _, _ = agent.get_action_and_value(micro_t, macro_t, pos_t, p_value_t)
 
             next_obs, reward, target_regime, target_change, truncate, done = env.step(action_t, belief_probs)
             if past_action == action_t:
@@ -151,7 +149,7 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
         
         #Update the weights
         (loss, policy_loss, value_loss,
-         belief_loss, change_loss, entropy) = trainer.update(buffer, train_config.timestamp, step, train_config.batch_size)
+         belief_loss, change_loss, entropy) = trainer.update(buffer, train_config.rollout_steps, step, train_config.batch_size)
         
         #create scatter visualization
         scatter = viz.log_belief_scatter(buffer)

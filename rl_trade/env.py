@@ -4,7 +4,7 @@ import joblib
 import random
 import torch
 from torch import Tensor
-from .compute import return_log, calcul_cost, profit_and_loss, reward_func, convert_to_usd 
+from .compute import return_log, reward_func
 from typing import Any
 from sklearn.preprocessing import StandardScaler
 

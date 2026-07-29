@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch import optim
 import numpy as np
-from torch import Tensor
 from .buffer import Buffer
 from .model import Agent, FocalLoss
 
@@ -17,7 +16,7 @@ class PPOTrainer:
                  value_coef:float=0.5,
                  belief_coef:float=0.1,
                  change_coef:float=0.1,
-                 ent_coef:float=0.01, 
+                 ent_coef:float=0.01,
                  ):
         self.model = model
         self.lr = lr
@@ -85,7 +84,7 @@ class PPOTrainer:
                 idx = torch.arange(start, end)
                 if idx.numel() == 0: continue
 
-                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _, actor_logits = self.model.get_action_and_value(
+                _, new_log_probs, dist_entropy, new_values, belief_logits, change_logits, _,  _ = self.model.get_action_and_value(
                         micro_states[idx],
                         macro_states[idx],
                         pos_type[idx],
