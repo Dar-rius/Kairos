@@ -149,7 +149,7 @@ with wandb.init(project=wandb_config.name, config=wandb_config.logs) as run:
         
         #Update the weights
         (loss, policy_loss, value_loss,
-         belief_loss, change_loss, entropy) = trainer.update(buffer, train_config.rollout_steps, step, train_config.batch_size)
+         belief_loss, change_loss, entropy) = trainer.update(buffer, train_config.num_update, step, train_config.batch_size)
         
         #create scatter visualization
         scatter = viz.log_belief_scatter(buffer)
